@@ -1,0 +1,1098 @@
+# =============================================================================
+# Oracle-labeled ground truth for the extraction-pipeline regression benchmark.
+# =============================================================================
+#
+# These labels were produced by reading the FROZEN fixture text (fixtures/*.md),
+# acting as the oracle — not the upstream CSV summaries. Re-label if you rebuild
+# a fixture (page content changed).
+#
+# Scoring model (see scorer.py). For each doc × ontology class we list:
+#   required:   entities that SHOULD be extracted → drive RECALL.
+#   acceptable: entities that are legitimately on the page but optional. A
+#               predicted entity matching an acceptable item is NOT counted as a
+#               false positive (so it never hurts precision) but does NOT add to
+#               recall. This is what makes precision fair for fuzzy extraction:
+#               `required` = must-have, `acceptable` = allowed, anything else a
+#               predicted entity matches = false positive.
+#
+# An EMPTY required list with empty acceptable means "the pipeline must emit
+# NOTHING of this class" — i.e. an anti-hallucination check (e.g. no CWE id is
+# present in the text, so emitting a VulnerabilityType is a false positive).
+#
+# Entity item forms:
+#   Vulnerability: {id: "CVE-..."}                      → match by normalized vuln_id
+#                  {title_any: ["jailbreak", "abuse"]}  → match a Vulnerability whose
+#                                                          id/title/description contains
+#                                                          ANY keyword (for no-CVE findings)
+#   other classes: {name: "X", aliases: ["Y", "Z"]}     → match predicted name vs name+aliases
+# =============================================================================
+
+docs:
+
+  # ── Single concrete CVE: Chrome WebView / Gemini panel priv-esc (Glic Jack) ──
+  thehackernews-new-chrome-vulnerability:
+    notes: "CVE-2026-0628 (CVSS 8.8) insufficient policy enforcement in Chrome WebView; malicious extension hijacks Gemini Live panel."
+    classes:
+      Vulnerability:
+        required:
+          - {id: "CVE-2026-0628"}
+      Vendor:
+        required:
+          - {name: "Google"}
+        acceptable:
+          - {name: "Palo Alto Networks", aliases: ["Unit 42"]}
+      Software:
+        required:
+          - {name: "Google Chrome", aliases: ["Chrome"]}
+          - {name: "Gemini", aliases: ["Gemini Live", "Gemini Live panel", "Gemini panel"]}
+      Attack:
+        required:
+          - {name: "Malicious Browser Extension", aliases: ["Malicious Extension", "Crafted Extension", "Script Injection", "JavaScript Injection"]}
+        acceptable:
+          - {name: "Indirect Prompt Injection", aliases: ["Prompt Injection", "Hidden Prompt"]}
+          - {name: "Glic Jack"}
+      Impact:
+        required:
+          - {name: "Privilege Escalation", aliases: ["Escalate Privileges"]}
+          - {name: "Remote Code Execution", aliases: ["Arbitrary Code Execution", "Code Execution"]}
+          - {name: "Data Exfiltration", aliases: ["Data Access", "Information Disclosure", "Sensitive Data Access", "Local File Access"]}
+        acceptable:
+          # "interacting with the file system, taking screenshots, accessing the
+          # camera, and turning on the microphone"
+          - {name: "Unauthorized Access", aliases: ["Device Access", "Camera Access", "Microphone Access"]}
+      VulnerabilityType:
+        required: []   # no explicit CWE id in the text → must not hallucinate one
+
+  # ── Multi-CVE research write-up: Claude Code RCE + API key exfiltration ──
+  research-caught-in-the:
+    notes: "Check Point: CVE-2025-59536 (RCE via hooks/MCP) + CVE-2026-21852 (API key exfil via ANTHROPIC_BASE_URL) in Anthropic Claude Code. GHSA-ph6w-f82w-28w6 is the first advisory."
+    classes:
+      Vulnerability:
+        required:
+          - {id: "CVE-2025-59536"}
+          - {id: "CVE-2026-21852"}
+        acceptable:
+          - {id: "GHSA-ph6w-f82w-28w6"}
+      Vendor:
+        required:
+          - {name: "Anthropic"}
+        acceptable:
+          - {name: "Check Point", aliases: ["Check Point Research"]}
+      Software:
+        required:
+          - {name: "Claude Code"}
+        acceptable:
+          - {name: "Model Context Protocol", aliases: ["MCP"]}
+          - {name: "Claude Workspaces", aliases: ["Workspaces", "Claude's Workspaces"]}
+          - {name: "Code Execution Tool"}
+          # "we set up mitmproxy, a tool for intercepting HTTP traffic" — attacker tooling
+          - {name: "mitmproxy"}
+      Attack:
+        required:
+          - {name: "Supply Chain Attack", aliases: ["Malicious Repository", "Malicious Project Configuration", "Malicious Configuration", "Malicious Pull Request", "Configuration-Based Attack", "Configuration Based Attack"]}
+        acceptable:
+          - {name: "MCP Consent Bypass", aliases: ["User Consent Bypass", "Consent Bypass"]}
+          - {name: "Malicious Hooks", aliases: ["Untrusted Hooks", "Hook Injection", "Untrusted Project Hooks"]}
+          - {name: "Honeypot Repository"}
+          - {name: "Internal Enterprise Repository"}
+          # "commands in .mcp.json may be executed, allowing injected commands to run"
+          - {name: "Code Injection", aliases: ["Command Injection"]}
+      Impact:
+        required:
+          - {name: "Remote Code Execution", aliases: ["RCE", "Arbitrary Command Execution", "Reverse Shell", "Code Execution"]}
+          - {name: "API Key Exfiltration", aliases: ["API Token Exfiltration", "Credential Theft", "API Key Theft", "Credential Exfiltration", "API Key Interception"]}
+        acceptable:
+          - {name: "Billing Fraud", aliases: ["API Credit Exhaustion", "Financial Loss", "Exhaust API Credits"]}
+          - {name: "Data Exfiltration", aliases: ["Information Disclosure", "Workspace File Access"]}
+          - {name: "Access Sensitive Files", aliases: ["Sensitive File Access", "Unauthorized Access"]}
+          - {name: "Delete Critical Files", aliases: ["File Deletion", "Data Destruction"]}
+          - {name: "Upload Arbitrary Files", aliases: ["Arbitrary File Upload", "Workspace Poisoning", "Poison Workspace"]}
+      VulnerabilityType:
+        required: []
+
+  # ── Real-world incident: Claude jailbroken to attack Mexican government ──
+        acceptable:
+          - {name: "CWE-94"}  # judge-proposed, reviewed
+  latimes-hacker-used-anthropic:
+    notes: "Gambit Security: attacker jailbroke Claude to find vulns, write exploits, exfiltrate 150GB Mexican gov data. ChatGPT used as a secondary tool. No CVE — one central misuse finding."
+    classes:
+      Vulnerability:
+        # One central finding. Keywords cover both how the LLM may frame it
+        # (jailbreak/misuse) AND the consequence framing (data breach/theft),
+        # since the extractor's chosen title varies.
+        required:
+          - {title_any: ["jailbreak", "guardrail", "misuse", "weaponiz", "bypass",
+                          "data breach", "data theft", "steal", "claude", "cyberattack", "exploit"]}
+      Vendor:
+        required:
+          - {name: "Anthropic"}
+        acceptable:
+          - {name: "OpenAI"}
+          - {name: "Gambit Security", aliases: ["Gambit"]}
+      Software:
+        required:
+          - {name: "Claude", aliases: ["Claude AI", "Claude Opus 4.6"]}
+        acceptable:
+          - {name: "ChatGPT"}
+      Attack:
+        required:
+          - {name: "Jailbreak", aliases: ["Jailbreaking", "Guardrail Bypass"]}
+        acceptable:
+          - {name: "Prompt Injection"}
+          - {name: "Social Engineering"}
+          - {name: "Cyber Espionage", aliases: ["AI-orchestrated cyber-espionage", "Cyberespionage"]}
+          - {name: "Penetration Testing"}
+      Impact:
+        required:
+          - {name: "Data Exfiltration", aliases: ["Data Theft", "Data Breach", "Information Theft", "Sensitive Data Theft"]}
+        acceptable:
+          - {name: "Credential Theft", aliases: ["Credential Compromise"]}
+          - {name: "Misuse for Cyberattacks", aliases: ["AI Weaponization", "Malware Generation", "Exploit Generation"]}
+          # "compromise multiple government identities and systems"
+          - {name: "Unauthorized Access", aliases: ["System Compromise", "Identity Compromise"]}
+      VulnerabilityType:
+        required: []
+
+  # ── Conceptual / advisory: NCSC says prompt injection is unfixable in LLMs ──
+  cyberscoop-uk-cyber-agency:
+    notes: "NCSC: prompt injection is inherent to LLM architecture. Conceptual — one central finding, no CVE. Products are examples only (ChatGPT)."
+    classes:
+      Vulnerability:
+        required:
+          - {title_any: ["prompt injection"]}
+      Vendor:
+        required: []
+        acceptable:
+          - {name: "OpenAI", aliases: ["Open AI"]}
+          - {name: "Anthropic"}
+          - {name: "NCSC", aliases: ["National Cyber Security Centre"]}
+      Software:
+        required: []
+        acceptable:
+          - {name: "ChatGPT"}
+          - {name: "Claude"}
+      Attack:
+        required:
+          - {name: "Prompt Injection"}
+        acceptable:
+          - {name: "Jailbreak", aliases: ["Jailbreaking"]}
+          - {name: "Indirect Prompt Injection"}
+      Impact:
+        required: []
+        acceptable:
+          - {name: "Remote Code Execution", aliases: ["RCE", "Code Execution"]}
+          - {name: "Data Leakage", aliases: ["Data Exfiltration", "Information Disclosure"]}
+          - {name: "Guardrail Bypass"}
+      VulnerabilityType:
+        required: []   # SQL injection is named only as a CONTRAST; no CWE id present
+
+  # ── Threat research: 17 GenAI products jailbroken (products anonymized) ──
+        acceptable:
+          - {name: "CWE-1427"}  # judge-proposed, reviewed
+  unit42-investigating-llm-jailbreaking:
+    notes: "Unit 42 jailbroke 17 GenAI web products; products ANONYMIZED → no named vendor/software should be extracted. One central finding."
+    classes:
+      Vulnerability:
+        required:
+          - {title_any: ["jailbreak"]}
+      Vendor:
+        required: []
+        acceptable:
+          - {name: "Palo Alto Networks", aliases: ["Unit 42"]}
+      Software:
+        required: []   # all tested products anonymized → naming one is a hallucination
+      Attack:
+        required:
+          - {name: "Jailbreak", aliases: ["Jailbreaking", "LLM Jailbreak"]}
+        acceptable:
+          - {name: "Prompt Injection"}
+          - {name: "Repeated Token Attack"}
+          - {name: "Storytelling Attack", aliases: ["Storytelling"]}
+          - {name: "Do Anything Now", aliases: ["DAN"]}
+          - {name: "Multi-turn Jailbreak"}
+          - {name: "Single-turn Jailbreak"}
+      Impact:
+        required:
+          - {name: "Data Leakage", aliases: ["Training Data Extraction", "Training Data Leakage", "Data Leak", "Sensitive Information Disclosure", "Sensitive Information Extraction", "Training Data Disclosure"]}
+        acceptable:
+          - {name: "System Prompt Disclosure", aliases: ["System Prompt Leakage", "System Prompt Extraction"]}
+          - {name: "Harmful Content Generation", aliases: ["Harmful Content", "Malware Generation",
+                                                             "Unsafe Content", "Malware Delivery"]}
+          - {name: "PII Disclosure", aliases: ["PII Leakage"]}
+          - {name: "Safety Violation", aliases: ["AI Safety Violation"]}
+          - {name: "Self-harm"}
+          - {name: "Hateful Content"}
+          - {name: "Indiscriminate Weapons"}
+          - {name: "Criminal Activity"}
+      VulnerabilityType:
+        required: []
+
+  # ── Nation-state actors abusing multiple GenAI tools (GTIG/KnowBe4) ──
+  blog-nation-state-threat:
+    notes: "GTIG: nation-state actors abuse Gemini/ChatGPT/Copilot/DeepSeek/Grok guardrails for phishing + ClickFix malware. One central misuse finding; many tools named."
+    classes:
+      Vulnerability:
+        required:
+          - {title_any: ["guardrail", "abuse", "misuse", "ai", "bypass", "phishing"]}
+      Vendor:
+        required:
+          - {name: "Google"}
+        acceptable:
+          - {name: "OpenAI"}
+          - {name: "Microsoft"}
+          - {name: "DeepSeek"}
+          - {name: "xAI"}
+          - {name: "KnowBe4"}
+      Software:
+        required:
+          - {name: "Gemini"}
+        acceptable:
+          - {name: "ChatGPT"}
+          - {name: "Copilot", aliases: ["CoPilot", "Microsoft Copilot"]}
+          - {name: "DeepSeek"}
+          - {name: "Grok"}
+      Attack:
+        required:
+          - {name: "Social Engineering", aliases: ["Phishing", "ClickFix", "Rapport-building Phishing"]}
+        acceptable:
+          - {name: "Guardrail Bypass", aliases: ["Safety Guardrail Bypass"]}
+          - {name: "Prompt Injection"}
+          - {name: "Jailbreak", aliases: ["Jailbreaking"]}
+      Impact:
+        required:
+          - {name: "Malware Delivery", aliases: ["Malware Distribution", "Malware Deployment", "Malware Installation", "Malware"]}
+        acceptable:
+          - {name: "Credential Theft", aliases: ["Account Compromise"]}
+          - {name: "Reconnaissance"}
+      VulnerabilityType:
+        required: []
+
+  # ── Conceptual: AI-driven supply chain attacks (case studies anonymized) ──
+  neuraltrust-ai-driven-supply:
+    notes: "NeuralTrust thought-leadership; case studies anonymized (Logistics SaaS, MedTech). Attack vectors: data poisoning, AI malware, deepfake vendor impersonation. No named products/CVEs."
+    classes:
+      Vulnerability:
+        required:
+          - {title_any: ["supply chain", "poison", "deepfake", "malware"]}
+      Vendor:
+        required: []   # all case studies anonymized
+        acceptable:
+          - {name: "NeuralTrust"}
+          - {name: "Cybersecurity Ventures"}
+          - {name: "World Economic Forum"}
+          - {name: "SolarWinds"}   # named as a historical comparison breach
+          - {name: "Kaseya"}       # named as a historical comparison breach
+      Software:
+        required: []
+      Attack:
+        required:
+          - {name: "Data Poisoning", aliases: ["Model Poisoning", "Model Corruption", "Training Data Poisoning", "AI Model Poisoning"]}
+        acceptable:
+          - {name: "Supply Chain Attack", aliases: ["AI-Driven Supply Chain Attack"]}
+          - {name: "Deepfake Vendor Impersonation", aliases: ["Deepfake Impersonation", "Deepfake"]}
+          - {name: "AI-Generated Malware", aliases: ["AI Malware", "Self-Learning Malware"]}
+          - {name: "Automated Reconnaissance", aliases: ["Supply Chain Reconnaissance"]}
+      Impact:
+        required:
+          - {name: "Data Exfiltration", aliases: ["Data Loss", "Data Theft", "Credential Exfiltration"]}
+        acceptable:
+          - {name: "Operational Disruption", aliases: ["Service Disruption", "Business Disruption"]}
+          - {name: "Firmware Backdoor", aliases: ["Backdoor", "Remote Tampering"]}
+          - {name: "Physical Harm", aliases: ["Safety Risk"]}
+          - {name: "Supply Chain Compromise"}
+          - {name: "Malicious Code Injection"}
+          - {name: "Fraudulent Vendor Approval"}
+          - {name: "Payment Authorization Fraud", aliases: ["Payment Fraud"]}
+          - {name: "Shipment Diversion"}
+          - {name: "Device Recall"}
+          # "breaches have cost businesses billions"; "malware can lie dormant when
+          # it suspects analysis"
+          - {name: "Financial Loss", aliases: ["Breach Costs", "Increased Breach Costs"]}
+          - {name: "Persistence", aliases: ["Dormancy", "Detection Evasion"]}
+          # "compromised AI models" injected upstream in the supply chain
+          - {name: "Model Manipulation", aliases: ["Compromised AI Models", "Model Poisoning"]}
+      VulnerabilityType:
+        required: []
+
+  # ── News roundup: GenAI misuse vs FortiGate, PromptSpy Android malware, ATM jackpotting ──
+  welivesecurity-this-month-in:
+    notes: "ESET/Tony Anscombe Feb-2026 roundup. Central AI finding: threat actors misused commercial GenAI to compromise 600+ FortiGate devices. Text explicitly says 'rather than specific vulnerabilities' → Vulnerability must NOT be required. ESET is the publisher → acceptable, not required."
+    classes:
+      Vulnerability:
+        required: []   # the text explicitly denies a concrete vulnerability
+        acceptable:
+          - {title_any: ["fortigate", "weak credential", "authentication", "exposed management",
+                          "genai", "generative ai", "misuse", "abuse",
+                          "promptspy", "android", "jackpot", "atm", "wiper"]}
+      Vendor:
+        required: []
+        acceptable:
+          - {name: "ESET"}
+          - {name: "Amazon", aliases: ["AWS", "Amazon Threat Intelligence"]}
+          - {name: "Fortinet"}
+          - {name: "FBI"}
+          - {name: "CERT Polska", aliases: ["Poland's CERT", "CERT.PL", "Polish CERT"]}
+      Software:
+        required:
+          - {name: "FortiGate", aliases: ["FortiGate devices", "Fortinet FortiGate"]}
+        acceptable:
+          - {name: "PromptSpy"}
+          - {name: "Android"}
+          - {name: "DynoWiper"}
+      Attack:
+        required:
+          - {name: "AI-Assisted Attack", aliases: ["GenAI Misuse", "Generative AI Misuse", "AI Misuse",
+                                                     "AI-Augmented Attack", "Misuse of Generative AI",
+                                                     "Commercial GenAI Tool Misuse", "AI Tool Abuse"]}
+        acceptable:
+          - {name: "ATM Jackpotting", aliases: ["Jackpotting", "Jackpotting Attack"]}
+          - {name: "Credential Attack", aliases: ["Weak Credential Exploitation", "Credential Stuffing",
+                                                    "Brute Force", "Weak Authentication Exploitation"]}
+          - {name: "Wiper Attack", aliases: ["Data Wiping"]}
+          - {name: "UI Manipulation", aliases: ["User Interface Manipulation", "Context-Aware UI Manipulation"]}
+          - {name: "Malware", aliases: ["Android Malware"]}
+      Impact:
+        required:
+          - {name: "Device Compromise", aliases: ["Unauthorized Access", "Compromised Devices", "System Compromise"]}
+        acceptable:
+          - {name: "Cash Theft", aliases: ["Cash Dispensing", "Financial Theft", "Financial Loss", "ATM Cash Theft"]}
+          - {name: "Data Destruction", aliases: ["Data Wiping", "Data Loss"]}
+          - {name: "Spying", aliases: ["Surveillance", "User Data Theft"]}
+          - {name: "Operational Disruption", aliases: ["Energy Sector Disruption", "Service Disruption"]}
+      VulnerabilityType:
+        required: []
+
+  # ── Vendor press release: Adversa AI "Top AI Security Incidents 2025" report ──
+        acceptable:
+          - {name: "CWE-1390"}  # judge-proposed, reviewed
+  adversa-top-ai-security:
+    notes: "Press release for an incidents report. No CVEs (anti-hallucination on Vulnerability). Named failed systems: Amazon Q, Microsoft Azure, OmniGPT, ElizaOS (+ Bing, Asana as case studies). Prompt injection = 35% of incidents."
+    classes:
+      Vulnerability:
+        required: []   # no CVE / no single concrete vulnerability → don't mint one
+        acceptable:
+          - {title_any: ["prompt injection", "data leak", "crypto", "incident", "cross-tenant", "mcp"]}
+      Vendor:
+        required:
+          - {name: "Adversa AI", aliases: ["Adversa"]}
+        acceptable:
+          - {name: "Microsoft"}
+          - {name: "Amazon"}
+          - {name: "Asana"}
+      Software:
+        required:
+          - {name: "Amazon Q"}
+          - {name: "ElizaOS"}
+        acceptable:
+          - {name: "Microsoft Azure", aliases: ["Azure"]}
+          - {name: "OmniGPT"}
+          - {name: "Microsoft Bing", aliases: ["Bing"]}
+          - {name: "Asana AI", aliases: ["Asana"]}
+          - {name: "Model Context Protocol", aliases: ["MCP", "MCP Stacks"]}
+          - {name: "Agentic AI Security Platform"}   # Adversa's own product, named on page
+      Attack:
+        required:
+          - {name: "Prompt Injection", aliases: ["Prompt Injection Attack", "Malicious Prompts", "Simple Prompts"]}
+        acceptable:
+          - {name: "Supply Chain Attack"}
+          - {name: "Jailbreak", aliases: ["Jailbreaking"]}
+          - {name: "API Abuse"}
+          - {name: "Cross-Tenant Attack", aliases: ["Cross-Tenant Data Leak"]}
+          - {name: "AI Red Teaming", aliases: ["Red Teaming"]}
+      Impact:
+        required:
+          - {name: "Financial Loss", aliases: ["Monetary Loss", "Crypto Theft", "Unauthorized Crypto Transfers",
+                                                 "Cryptocurrency Theft", "Real Losses"]}
+          - {name: "Data Leak", aliases: ["Data Leakage", "Personal Data Leak", "Cross-Tenant Data Leak",
+                                            "Data Exposure", "Information Disclosure", "Data Exfiltration"]}
+        acceptable:
+          - {name: "Legal Liability", aliases: ["Legal Disasters", "Legal Consequences"]}
+          - {name: "API Abuse"}
+          - {name: "Reputational Damage"}
+          # "crypto thefts, API abuses" — agents triggering transfers on the victim's behalf
+          - {name: "Unauthorized Actions", aliases: ["Unauthorized Transactions"]}
+          - {name: "Credential Theft", aliases: ["API Key Theft"]}
+          # listed on-page under damages ("crypto thefts, API abuses ... and Supply chain attacks")
+          - {name: "Supply Chain Attack", aliases: ["Supply Chain Attacks", "Supply Chain Compromise"]}
+      VulnerabilityType:
+        required: []
+
+  # ── Conceptual: agentic AI as attacker tooling (Barracuda) — light-entity doc ──
+  blog-agentic-ai-the:
+    notes: "Barracuda thought-leadership on agentic-AI-driven attacks. No CVE, no vulnerable product (FortiGate named only as a past incident example). Mostly a precision / anti-hallucination test."
+    classes:
+      Vulnerability:
+        required: []   # no concrete vulnerability is described
+        acceptable:
+          - {title_any: ["agentic", "autonomous", "ransomware", "ai"]}
+      Vendor:
+        required: []
+        acceptable:
+          - {name: "Barracuda", aliases: ["Barracuda Networks"]}
+          - {name: "Fortinet"}
+          - {name: "Trend Micro"}
+          - {name: "Aisera"}
+      Software:
+        required: []
+        acceptable:
+          - {name: "FortiGate", aliases: ["FortiGate firewalls", "Fortinet FortiGate"]}
+      Attack:
+        required:
+          - {name: "Agentic AI Attack", aliases: ["Autonomous Attack", "Agentic Attack", "AI Agent Attack",
+                                                    "Autonomous AI Attack", "Agentic AI-Driven Attack"]}
+        acceptable:
+          # ransomware groups are named as actor CONTEXT, not a described technique
+          - {name: "Ransomware", aliases: ["Ransomware Attack"]}
+          - {name: "Phishing", aliases: ["AI-Generated Phishing", "Phishing Content Generation"]}
+          - {name: "Malware Generation", aliases: ["Malware Development", "AI-Generated Malware"]}
+          - {name: "Reconnaissance", aliases: ["Automated Reconnaissance", "Attack Reconnaissance"]}
+          - {name: "Credential Theft"}
+      Impact:
+        required: []
+        acceptable:
+          - {name: "Credential Theft", aliases: ["Credential Compromise"]}
+          - {name: "Initial Access", aliases: ["Unauthorized Access", "Network Access", "Network Compromise",
+                                                 "System Compromise"]}
+          - {name: "Data Breach"}
+          - {name: "Persistence", aliases: ["Persistent Access"]}
+          # "gain access and conduct reconnaissance on victim networks"
+          - {name: "Reconnaissance"}
+      VulnerabilityType:
+        required: []
+
+  # ── Reference article: OWASP Top 10 for LLM Applications 2025 (Barracuda) ──
+  blog-owasp-top-10:
+    notes: "Walkthrough of all 10 OWASP LLM risks. No CVEs, no vulnerable products. Rich in Attack/Impact concepts; risk names may surface as Vulnerability OR Attack — acceptable shields either framing."
+    classes:
+      Vulnerability:
+        required: []   # risk categories, not concrete vulnerabilities
+        acceptable:
+          - {title_any: ["prompt injection", "sensitive information", "supply chain", "poisoning",
+                          "output handling", "excessive agency", "system prompt", "embedding",
+                          "misinformation", "unbounded consumption", "llm", "owasp"]}
+      Vendor:
+        required: []
+        acceptable:
+          - {name: "OWASP"}
+          - {name: "Barracuda", aliases: ["Barracuda Networks"]}
+      Software:
+        required: []
+        acceptable:
+          - {name: "Large Language Models", aliases: ["LLM", "LLMs", "LLM Applications", "GenAI"]}
+      Attack:
+        required:
+          - {name: "Prompt Injection"}
+          - {name: "Data Poisoning", aliases: ["Data and Model Poisoning", "Model Poisoning",
+                                                 "Training Data Poisoning", "Poisoning Attack"]}
+        acceptable:
+          - {name: "Supply Chain Attack", aliases: ["Supply Chain Vulnerabilities"]}
+          - {name: "Jailbreak", aliases: ["Jailbreaking"]}
+          - {name: "System Prompt Leakage", aliases: ["Prompt Leakage"]}
+          - {name: "Embedding Attack", aliases: ["Vector and Embedding Weaknesses", "Embedding Exploitation",
+                                                   "Vector Attack"]}
+          - {name: "Backdoor", aliases: ["Hidden Backdoor", "Backdoor Attack"]}
+          - {name: "Denial of Service", aliases: ["Unbounded Consumption", "Resource Exhaustion"]}
+          - {name: "Excessive Agency", aliases: ["Excessive Autonomy"]}
+          - {name: "Sensitive Information Disclosure"}
+      Impact:
+        required:
+          - {name: "Sensitive Information Disclosure", aliases: ["Information Disclosure", "Data Leak",
+                                                                   "Data Leakage", "Sensitive Data Disclosure",
+                                                                   "Confidential Data Exposure"]}
+        acceptable:
+          - {name: "Misinformation", aliases: ["False Information", "Biased Output", "Misleading Outputs",
+                                                 "Skewed Outputs"]}
+          - {name: "Unauthorized Actions"}
+          - {name: "Supply Chain Compromise"}
+          - {name: "Denial of Service", aliases: ["Resource Exhaustion", "Degraded Performance",
+                                                    "System Overload"]}
+          - {name: "Financial Loss", aliases: ["Billing Surge", "Increased Costs"]}
+          - {name: "Harmful Content", aliases: ["Harmful Content Generation", "Harmful Language"]}
+          - {name: "Unauthorized Access"}
+          - {name: "System Prompt Leakage", aliases: ["System Prompt Disclosure"]}
+          - {name: "Unintended Code Execution", aliases: ["Unsafe Code Execution", "Code Execution"]}
+          - {name: "Reputational Damage", aliases: ["Reputation Damage"]}
+          - {name: "Legal Liability", aliases: ["Legal Liabilities"]}
+          - {name: "Bias", aliases: ["Biased Content"]}
+          # consequences the OWASP entries themselves name (poisoning, embeddings,
+          # sensitive-disclosure sections)
+          - {name: "Credential Theft", aliases: ["API Key Leakage", "Credential Leakage"]}
+          - {name: "Model Manipulation", aliases: ["Model Tampering", "Altered Outputs"]}
+          - {name: "Model Backdoor", aliases: ["Backdoor"]}
+          - {name: "Data Integrity Manipulation", aliases: ["Integrity Compromise"]}
+      VulnerabilityType:
+        required: []
+
+  # ── Deep-dive: prompt injection defense guide (Obsidian Security) ──
+        acceptable:
+          - {name: "CWE-1427"}  # judge-proposed, reviewed
+  obsidiansecurity-prompt-injection-attacks:
+    notes: "Long defense-oriented guide. Central finding: prompt injection (no CVE). Named tech (Splunk, Azure, AWS, Salesforce/Salesloft/Drift) appears only in defense examples or the sidebar breach story — acceptable, not required."
+    classes:
+      Vulnerability:
+        required:
+          - {title_any: ["prompt injection"]}
+        acceptable:
+          - {title_any: ["jailbreak", "token compromise", "oauth", "salesloft"]}
+      Vendor:
+        required: []
+        acceptable:
+          - {name: "Obsidian Security", aliases: ["Obsidian"]}
+          - {name: "OWASP"}
+          - {name: "Salesforce"}
+          - {name: "Salesloft"}
+          - {name: "Drift"}
+          - {name: "Amazon", aliases: ["AWS"]}
+          - {name: "Microsoft", aliases: ["Azure"]}
+          - {name: "Splunk"}
+          - {name: "NIST"}
+          - {name: "FBI"}
+      Software:
+        required: []
+        acceptable:
+          - {name: "Splunk"}
+          - {name: "Azure Sentinel"}
+          - {name: "Azure AD", aliases: ["Azure Active Directory", "Azure AD Managed Identities"]}
+          - {name: "Salesforce"}
+          - {name: "Salesloft"}
+          - {name: "Drift", aliases: ["Salesloft-Drift"]}
+          - {name: "DynamoDB", aliases: ["Amazon DynamoDB"]}
+          - {name: "AWS Lambda", aliases: ["Lambda"]}
+          - {name: "AWS IAM", aliases: ["IAM"]}
+          - {name: "Large Language Models", aliases: ["LLM", "LLMs"]}
+      Attack:
+        required:
+          - {name: "Prompt Injection", aliases: ["Prompt Injection Attack"]}
+          - {name: "Jailbreak", aliases: ["Jailbreaking", "Jailbreak Attack"]}
+        acceptable:
+          - {name: "Direct Prompt Injection"}
+          - {name: "Indirect Prompt Injection"}
+          - {name: "Cross-Plugin Poisoning", aliases: ["Cross Plugin Poisoning", "Plugin Poisoning"]}
+          - {name: "Supply Chain Attack", aliases: ["OAuth Token Compromise", "Third-Party App Compromise"]}
+          - {name: "Credential Theft", aliases: ["Token Compromise", "Stolen Credentials"]}
+      Impact:
+        required:
+          - {name: "Data Exfiltration", aliases: ["Data Leak", "Data Leakage", "Data Breach",
+                                                    "Data Breaches", "Information Disclosure",
+                                                    "Exfiltration of Confidential Data",
+                                                    "Exfiltrate Confidential Data",
+                                                    "Leak of Business Intelligence"]}
+          - {name: "Unauthorized Actions", aliases: ["Unauthorized Access", "Unauthorized Data Access",
+                                                       "Execute Unauthorized Actions", "Authorization Bypass",
+                                                       "Bypass Authentication", "Bypass Authorization"]}
+        acceptable:
+          - {name: "Privilege Escalation", aliases: ["Elevated Privileges", "Excessive Privileges"]}
+          - {name: "Misinformation", aliases: ["Manipulated Outputs", "Manipulate Outputs", "Fraud",
+                                                 "Output Manipulation"]}
+          - {name: "Safety Filter Bypass", aliases: ["Disable Safety Filters", "Guardrail Bypass"]}
+          - {name: "Security Control Bypass", aliases: ["Bypass Security Controls",
+                                                          "Override System Directives",
+                                                          "Instruction Override"]}
+          - {name: "Lateral Movement"}
+          - {name: "Regulatory Fines", aliases: ["Compliance Violation"]}
+          - {name: "Reputational Damage", aliases: ["Reputation Damage"]}
+          # "$18M in potential losses from manipulated transaction approvals";
+          # consequences escalating as AI gains access to business functions
+          - {name: "Financial Loss", aliases: ["Monetary Loss", "Transaction Fraud"]}
+          - {name: "Operational Disruption", aliases: ["Business Disruption"]}
+      VulnerabilityType:
+        required: []
+
+  # ── Pure anti-hallucination doc: OWASP Top-10 2026 survey announcement (LinkedIn) ──
+        acceptable:
+          - {name: "CWE-1427"}  # judge-proposed, reviewed
+  linkedin-kicking-off-the:
+    notes: "Project announcement + survey call. Contains essentially NO extractable security entities — every class has empty required. Any non-acceptable prediction is a false positive. Tests restraint on boilerplate-heavy social pages."
+    classes:
+      Vulnerability:
+        required: []
+        acceptable:
+          - {title_any: ["prompt", "agentic", "leak", "llm", "owasp"]}
+      Vendor:
+        required: []
+        acceptable:
+          - {name: "OWASP", aliases: ["OWASP Generative AI Security Project"]}
+          - {name: "LinkedIn"}
+          - {name: "Anthropic"}   # sidebar article titles only
+      Software:
+        required: []
+        acceptable:
+          - {name: "OpenClaw"}    # sidebar article titles only
+          - {name: "Claude Mythos", aliases: ["Anthropic Mythos", "Mythos"]}   # sidebar titles
+          - {name: "Project Glasswing", aliases: ["Glasswing"]}                # sidebar titles
+          - {name: "Lobot"}                                                     # sidebar titles
+          - {name: "Large Language Models", aliases: ["LLM", "LLMs"]}
+      Attack:
+        required: []
+        acceptable:
+          - {name: "Prompt Injection", aliases: ["Prompt Chain Exploitation", "Complex Prompt Chains"]}
+          - {name: "Agent Manipulation", aliases: ["Manipulation via Autonomous Agents",
+                                                     "Multi-Modal Agent Manipulation"]}
+      Impact:
+        required: []
+        acceptable:
+          - {name: "Data Leak", aliases: ["Contextual Data Leak", "API Data Leak", "Data Leakage",
+                                            "Data Exfiltration"]}
+          # OWASP agentic-security topics the post previews
+          - {name: "Model Manipulation", aliases: ["Agent Manipulation", "Model Tampering"]}
+      VulnerabilityType:
+        required: []
+
+  # ── Single CVE (NVD): EmailGPT prompt-injection CVE-2024-5184 ──
+  nvd-emailgpt-prompt-injection:
+    notes: "NVD detail page for CVE-2024-5184: prompt injection in the EmailGPT API service. Vendor/product EmailGPT; CWE-74; source Synopsys. NVD change-history boilerplate adds noise."
+    classes:
+      Vulnerability:
+        required:
+          - {id: "CVE-2024-5184"}
+      Vendor:
+        required:
+          - {name: "EmailGPT"}
+        acceptable:
+          - {name: "Synopsys"}
+          - {name: "NIST", aliases: ["NVD"]}
+          - {name: "CISA", aliases: ["CISA-ADP"]}
+      Software:
+        required:
+          - {name: "EmailGPT"}
+      Attack:
+        required:
+          - {name: "Prompt Injection", aliases: ["Direct Prompt Injection"]}
+        acceptable:
+          - {name: "System Prompt Extraction", aliases: ["System Prompt Leak"]}
+      Impact:
+        required:
+          - {name: "System Prompt Disclosure", aliases: ["System Prompt Leakage", "Leak System Prompts",
+                                                           "Information Disclosure"]}
+        acceptable:
+          - {name: "Service Takeover", aliases: ["Take Over Service Logic", "Logic Manipulation"]}
+          - {name: "Harmful Content", aliases: ["Harmful Information"]}
+          # the CVE text: "allows attackers to execute unwanted prompts"
+          - {name: "Instruction Override", aliases: ["Execution of Unwanted Prompts",
+                                                       "Unwanted Prompt Execution"]}
+      VulnerabilityType:
+        # CWE-74 is present verbatim on the page → the mapper may legitimately emit it.
+        required: []
+        acceptable:
+          - {name: "CWE-74"}
+
+  # ── Single CVE (NVD): LangChain PALChain code injection CVE-2023-36258 ──
+  nvd-langchain-palchain-code:
+    notes: "NVD detail for CVE-2023-36258: arbitrary code execution via PALChain python exec in LangChain < 0.0.236. CWE-94 (CISA-ADP). No vendor field on NVD."
+    classes:
+      Vulnerability:
+        required:
+          - {id: "CVE-2023-36258"}
+      Vendor:
+        required: []
+        acceptable:
+          - {name: "LangChain"}
+          - {name: "MITRE"}
+          - {name: "NIST", aliases: ["NVD"]}
+          - {name: "CISA", aliases: ["CISA-ADP"]}
+      Software:
+        required:
+          - {name: "LangChain", aliases: ["langchain"]}
+        acceptable:
+          - {name: "PALChain"}
+      Attack:
+        required:
+          - {name: "Code Injection", aliases: ["Arbitrary Code Execution", "Python Code Injection",
+                                                 "Code Execution via PALChain"]}
+      Impact:
+        required:
+          - {name: "Remote Code Execution", aliases: ["Arbitrary Code Execution", "Code Execution",
+                                                        "RCE"]}
+      VulnerabilityType:
+        required: []
+        acceptable:
+          - {name: "CWE-94"}
+          - {name: "CWE-74"}
+
+  # ── GitHub advisory: LangChain SSRF / code injection GHSA-7gfq-f96f-g85j ──
+  github-langchain-ssrf-advisory:
+    notes: "GitHub Security Advisory GHSA-7gfq-f96f-g85j (CVE-2023-36281) in langchain-ai/langchain: code injection via load_prompt / Jinja2 template SSTI. CWE-94. Page is mostly CVSS-metric boilerplate."
+    classes:
+      Vulnerability:
+        required:
+          # the advisory page carries both ids for the same finding; either
+          # identifies it, so don't score on which spelling the model picked
+          - {id_any: ["GHSA-7gfq-f96f-g85j", "CVE-2023-36281"]}
+      Vendor:
+        required: []
+        acceptable:
+          - {name: "LangChain", aliases: ["langchain-ai"]}
+      Software:
+        required:
+          - {name: "LangChain", aliases: ["langchain", "langchain-ai/langchain"]}
+      Attack:
+        required:
+          - {name: "Code Injection", aliases: ["Template Injection", "Server-Side Template Injection",
+                                                 "SSTI", "Arbitrary Code Execution", "Prompt Template Injection"]}
+      Impact:
+        required:
+          - {name: "Remote Code Execution", aliases: ["Arbitrary Code Execution", "Code Execution", "RCE"]}
+      VulnerabilityType:
+        required: []
+        acceptable:
+          - {name: "CWE-94"}
+
+  # ── GitHub advisory: llama-cpp-python Jinja2 template RCE GHSA-56xg-wfcc-g829 ──
+  github-langchain-sql-injection:
+    notes: "GitHub Security Advisory GHSA-56xg-wfcc-g829 (CVE-2024-34359, 'Llama Drama'): RCE via unsafe Jinja2 chat_template in abetlen/llama-cpp-python. CWE-76. (id kept from crawl slug; content is the llama-cpp advisory.)"
+    classes:
+      Vulnerability:
+        required:
+          - {id_any: ["GHSA-56xg-wfcc-g829", "CVE-2024-34359"]}
+      Vendor:
+        required: []
+        acceptable:
+          - {name: "abetlen"}
+      Software:
+        required:
+          - {name: "llama-cpp-python", aliases: ["llama_cpp", "llama-cpp"]}
+        acceptable:
+          - {name: "Jinja2"}
+      Attack:
+        required:
+          - {name: "Template Injection", aliases: ["Server-Side Template Injection", "SSTI",
+                                                     "Jinja2 Template Injection", "Code Injection",
+                                                     "Chat Template Injection"]}
+      Impact:
+        required:
+          - {name: "Remote Code Execution", aliases: ["Arbitrary Code Execution", "Code Execution", "RCE"]}
+      VulnerabilityType:
+        required: []
+        acceptable:
+          - {name: "CWE-76"}
+          - {name: "CWE-94"}
+
+  # ── Research blog: indirect prompt injection writes ChatGPT memories ──
+  embracethered-chatgpt-hacking-memories:
+    notes: "Embrace The Red: indirect prompt injection via Connected Apps / image upload / browsing writes persistent false memories into ChatGPT. OpenAI closed it as 'model safety', not a CVE. One central finding."
+    classes:
+      Vulnerability:
+        required:
+          - {title_any: ["prompt injection", "memory", "indirect"]}
+      Vendor:
+        required:
+          - {name: "OpenAI"}
+        acceptable:
+          - {name: "Microsoft"}
+          - {name: "Google"}
+      Software:
+        required:
+          - {name: "ChatGPT"}
+        acceptable:
+          - {name: "Bing", aliases: ["Bing Chat"]}
+          - {name: "Google Docs", aliases: ["Google Drive"]}
+          - {name: "OneDrive"}
+      Attack:
+        required:
+          - {name: "Indirect Prompt Injection", aliases: ["Prompt Injection", "Memory Injection"]}
+        acceptable:
+          - {name: "Automatic Tool Invocation", aliases: ["Tool Chaining"]}
+          - {name: "Delayed Tool Invocation", aliases: ["Delayed Execution"]}
+      Impact:
+        required:
+          - {name: "Memory Poisoning", aliases: ["False Memory Injection", "Persistent Memory Manipulation",
+                                                   "Data Integrity Loss", "Store False Memories",
+                                                   "Model Manipulation"]}
+        acceptable:
+          - {name: "Misinformation", aliases: ["Bias", "False Information"]}
+          - {name: "Persistence"}
+          - {name: "Data Deletion", aliases: ["Delete Memories"]}
+          # the model follows instructions from an injected document instead of the user
+          - {name: "Instruction Override", aliases: ["Behavior Override"]}
+      VulnerabilityType:
+        required: []
+
+  # ── Research blog: M365 Copilot prompt injection → data exfil via ASCII smuggling ──
+  embracethered-copilot-ascii-smuggling:
+    notes: "Embrace The Red: full M365 Copilot exploit chain — prompt injection + automatic tool invocation + ASCII smuggling + hyperlink rendering to exfiltrate emails/PII. Disclosed to MSRC, fixed. One central finding."
+    classes:
+      Vulnerability:
+        required:
+          - {title_any: ["prompt injection", "exfiltration", "ascii smuggling", "copilot"]}
+      Vendor:
+        required:
+          - {name: "Microsoft", aliases: ["MSRC"]}
+      Software:
+        required:
+          - {name: "Microsoft 365 Copilot", aliases: ["M365 Copilot", "Copilot", "Microsoft Copilot"]}
+      Attack:
+        required:
+          - {name: "Prompt Injection", aliases: ["Indirect Prompt Injection"]}
+          - {name: "ASCII Smuggling", aliases: ["Unicode Tag Smuggling", "Hidden Unicode"]}
+        acceptable:
+          - {name: "Automatic Tool Invocation", aliases: ["Request Forgery", "Tool Invocation"]}
+          - {name: "Conditional Prompt Injection"}
+          - {name: "Hyperlink Rendering"}
+      Impact:
+        required:
+          - {name: "Data Exfiltration", aliases: ["Data Theft", "Email Theft", "PII Exfiltration",
+                                                    "Information Theft", "Steal Emails",
+                                                    "Information Disclosure"]}
+        acceptable:
+          - {name: "Credential Theft", aliases: ["MFA Code Theft"]}
+          - {name: "Phishing", aliases: ["Scam"]}
+      VulnerabilityType:
+        required: []
+
+  # ── Research blog: Sleepy Pickle ML model supply-chain attack (Trail of Bits) ──
+        acceptable:
+          - {name: "CWE-1427"}  # judge-proposed, reviewed
+  blog-pickle-file-attacks:
+    notes: "Trail of Bits: 'Sleepy Pickle' — malicious pickle payloads (via Fickling) compromise the ML model itself on deserialization to insert backdoors, steal data, or phish. Model supply-chain finding; no CVE."
+    classes:
+      Vulnerability:
+        # Central finding has no CVE; a minted AISC id for the Sleepy Pickle
+        # weakness is correct behavior, so any minted/keyword vuln is acceptable.
+        required:
+          - {title_any: ["pickle", "sleepy pickle", "deserialization", "supply chain", "aisc-"]}
+      Vendor:
+        required: []
+        acceptable:
+          - {name: "Trail of Bits"}
+          - {name: "Hugging Face", aliases: ["HuggingFace"]}
+          - {name: "Google"}   # Google Assistant named as an at-risk app
+      Software:
+        required: []
+        acceptable:
+          - {name: "Pickle", aliases: ["pickle", "Pickle file format"]}
+          - {name: "Fickling"}
+          - {name: "GPT-2-XL", aliases: ["GPT-2"]}
+          - {name: "SafeTensors"}
+          - {name: "PyTorch"}
+          - {name: "ROME"}
+          # LLM-based apps named on-page as at-risk / examples
+          - {name: "Otter AI"}
+          - {name: "Avoma"}
+          - {name: "Fireflies"}
+          - {name: "ReaderGPT"}
+          - {name: "Smmry"}
+          - {name: "Smodin"}
+          - {name: "TldrThis"}
+      Attack:
+        required:
+          - {name: "Deserialization Attack", aliases: ["Pickle Deserialization", "Malicious Pickle",
+                                                         "Pickle Injection", "Sleepy Pickle",
+                                                         "Insecure Deserialization"]}
+        acceptable:
+          - {name: "Supply Chain Attack", aliases: ["Supply Chain Compromise", "Model Supply Chain Attack"]}
+          - {name: "Model Poisoning", aliases: ["Model Tampering", "Weight Poisoning"]}
+          - {name: "Man-in-the-Middle", aliases: ["MITM"]}
+          - {name: "Backdoor", aliases: ["Model Backdoor"]}
+          - {name: "Sticky Pickle"}
+          - {name: "Phishing", aliases: ["Insider Attack", "Phishing or Insider Attacks"]}
+          - {name: "Post-Exploitation", aliases: ["Post-Exploitation of System Weaknesses"]}
+          - {name: "Malicious Link Insertion"}
+          - {name: "Cross-Site Scripting", aliases: ["XSS", "JavaScript Injection"]}
+      Impact:
+        required:
+          - {name: "Arbitrary Code Execution", aliases: ["Remote Code Execution", "Code Execution", "RCE"]}
+        acceptable:
+          - {name: "Data Theft", aliases: ["Steal User Data", "Data Exfiltration", "Privacy Loss"]}
+          - {name: "Misinformation", aliases: ["Harmful Output", "Disinformation", "Harmful Content"]}
+          - {name: "Phishing", aliases: ["Malicious Links", "Scam"]}
+          - {name: "Model Backdoor", aliases: ["Backdoor"]}
+          - {name: "Model Tampering", aliases: ["Tampering with Model Code", "Model Manipulation"]}
+          - {name: "Denial of Service", aliases: ["System Crash", "Crash"]}
+          - {name: "Detection Evasion", aliases: ["Evading Detection"]}
+          # "the payload can tamper with the user's system or data"; "maintains a
+          # foothold on ML systems"
+          - {name: "System Tampering", aliases: ["Tamper with User System", "Data Tampering"]}
+          - {name: "Persistence", aliases: ["Foothold", "Persistent Access"]}
+          - {name: "Malware Infection", aliases: ["Malware"]}
+          - {name: "Compromise User Security", aliases: ["Compromise End-User Security",
+                                                          "Compromise End-User Safety",
+                                                          "Compromise End-User Privacy"]}
+      VulnerabilityType:
+        required: []
+
+  # ── Research blog: ShadowLogic computational-graph model backdoors (HiddenLayer) ──
+        acceptable:
+          - {name: "CWE-502"}  # judge-proposed, reviewed
+  hiddenlayer-shadowlogic-backdoor-technique:
+    notes: "HiddenLayer: 'ShadowLogic' implants no-code logic backdoors directly in a model's computational graph (ONNX/PyTorch/TensorFlow), persisting across fine-tuning. Demonstrated on ResNet, YOLO, Phi-3. Research technique; no CVE."
+    classes:
+      Vulnerability:
+        required:
+          - {title_any: ["shadowlogic", "backdoor", "computational graph"]}
+      Vendor:
+        required: []
+        acceptable:
+          - {name: "HiddenLayer"}
+          # institutions cited for prior backdoor research, legitimately on-page
+          - {name: "New York University", aliases: ["NYU"]}
+          - {name: "UC Berkeley", aliases: ["Berkeley"]}
+          - {name: "MIT"}
+          - {name: "IAS"}
+          - {name: "Microsoft"}
+          # named on the page as the maker of CoreML
+          - {name: "Apple"}
+      Software:
+        required: []
+        acceptable:
+          - {name: "ONNX"}
+          - {name: "PyTorch"}
+          - {name: "TensorFlow"}
+          - {name: "ResNet"}
+          - {name: "YOLO"}
+          - {name: "Phi-3"}
+          - {name: "CoreML"}
+          - {name: "OpenVINO"}
+          - {name: "Netron"}          # graph-visualization tool named on page
+          - {name: "Model Explorer"}  # graph-visualization tool named on page
+      Attack:
+        required:
+          - {name: "Model Backdoor", aliases: ["Computational Graph Backdoor", "Logic Backdoor",
+                                                 "ShadowLogic", "No-Code Backdoor", "Graph Backdoor",
+                                                 "Backdoor Injection", "Backdoor Creation",
+                                                 "Backdoor Attack", "Backdoor"]}
+        acceptable:
+          - {name: "Data Poisoning", aliases: ["Dataset Backdoor", "Training Data Poisoning"]}
+          - {name: "Supply Chain Attack", aliases: ["Supply Chain Compromise"]}
+          - {name: "Deserialization Attack"}
+      Impact:
+        required:
+          - {name: "Model Manipulation", aliases: ["Output Manipulation", "Attacker-Defined Output",
+                                                     "Attacker-Defined Outcome", "Model Hijack",
+                                                     "Bypass Model Logic", "Model Integrity Loss",
+                                                     "Classification Manipulation"]}
+        acceptable:
+          - {name: "Misclassification", aliases: ["Targeted Misclassification", "Manipulated Object Detection",
+                                                    "Misinformation"]}
+          - {name: "Persistence", aliases: ["Persistent Foothold", "Persistent Threat"]}
+          - {name: "Data Theft", aliases: ["Information Theft"]}
+          - {name: "Hidden Behavior Activation"}
+          - {name: "Controlled Token Generation", aliases: ["Token Manipulation"]}
+          - {name: "Undetectable Backdoors", aliases: ["Undetectable Backdoor"]}
+          - {name: "Erosion of Trust", aliases: ["Trust Erosion"]}
+          - {name: "Unauthorized Access"}
+      VulnerabilityType:
+        required: []
+
+  # ── Research blog: visual / multimodal prompt injection (Lakera) ──
+  lakera-visual-prompt-injections:
+    notes: "Lakera hackathon writeup: visual prompt injections — malicious instructions embedded in images override GPT-4V behavior (invisibility cloak, captcha bypass, off-white text). Concept finding; no CVE. Lakera-product boilerplate adds noise."
+    classes:
+      Vulnerability:
+        required:
+          - {title_any: ["visual prompt injection", "prompt injection"]}
+      Vendor:
+        required: []
+        acceptable:
+          - {name: "Lakera"}
+          - {name: "OpenAI"}
+          - {name: "Dropbox"}
+      Software:
+        required: []
+        acceptable:
+          - {name: "GPT-4V", aliases: ["GPT-V4", "GPT-4", "ChatGPT"]}
+          - {name: "Lakera Guard"}
+          - {name: "Gandalf"}
+      Attack:
+        required:
+          - {name: "Visual Prompt Injection", aliases: ["Multimodal Prompt Injection", "Image Prompt Injection",
+                                                          "Prompt Injection"]}
+        acceptable:
+          - {name: "Jailbreak", aliases: ["Guardrail Bypass"]}
+          - {name: "CAPTCHA Bypass"}
+          # specific demo payloads named in the hackathon writeup
+          - {name: "Invisibility Cloak"}
+          - {name: "Identity Manipulation"}
+          - {name: "Environment Manipulation"}
+          - {name: "Human-to-Robot Deception", aliases: ["Deception"]}
+          - {name: "Ad Suppression"}
+      Impact:
+        required:
+          - {name: "Instruction Override", aliases: ["Ignore Original Instructions", "Unintended Actions",
+                                                       "Bypass Defenses", "Model Manipulation",
+                                                       "Perform Unintended Actions"]}
+        acceptable:
+          - {name: "Safety Filter Bypass", aliases: ["Guardrail Bypass"]}
+          - {name: "Misinformation"}
+          # the demo effects, scored as Impacts when the model frames them as
+          # what the injection achieves (they also appear under Attack)
+          - {name: "Identity Manipulation", aliases: ["Misdescribe People"]}
+          - {name: "Ad Suppression", aliases: ["Advertising Suppression", "Advertising Manipulation",
+                                                 "Suppression of Competing Content"]}
+      VulnerabilityType:
+        required: []
+
+  securityweek-vulnerability-in-claude:
+    notes: >-
+      SecurityWeek report on ClaudeBleed (LayerX research, May 2026): the Claude
+      extension for Chrome trusts the *origin* of a message (claude.ai) rather
+      than its execution *context*, so any zero-permission Chrome extension can
+      run a Main-world content script, message the Claude extension, and issue
+      privileged commands. Attacker forges user approval by repeatedly sending
+      the confirmation message and manipulates the DOM to alter what Claude
+      "sees". No CVE. Concrete single-finding advisory-style news piece, but the
+      page also carries ad markup, four "Related:" links, an author bio and a
+      newsletter form — those must yield nothing.
+    classes:
+      Vulnerability:
+        required:
+          - {title_any: ["claudebleed", "claude extension", "claude in chrome", "prompt injection"]}
+      Vendor:
+        required:
+          - {name: "Anthropic"}
+        acceptable:
+          - {name: "LayerX", aliases: ["LayerX Security"]}
+          - {name: "Google"}
+      Software:
+        required:
+          - {name: "Claude Extension for Chrome", aliases: ["Claude in Chrome", "Claude Chrome Extension",
+                                                              "Claude Browser Extension", "Claude"]}
+        acceptable:
+          - {name: "Google Chrome", aliases: ["Chrome"]}
+          - {name: "Gmail"}
+          - {name: "GitHub"}
+          - {name: "Google Drive"}
+          - {name: "claude.ai"}
+      Attack:
+        required:
+          # the exploitation step, named verbatim in the text
+          - {name: "Remote Prompt Injection", aliases: ["Prompt Injection", "Indirect Prompt Injection"]}
+          # the delivery vector and the article's actual novelty: a zero-permission
+          # extension inheriting a trusted agent's capabilities
+          - {name: "Malicious Browser Extension", aliases: ["Malicious Extension", "Zero-Permission Extension",
+                                                              "Content Script Injection", "Extension Hijacking"]}
+        acceptable:
+          - {name: "DOM Manipulation"}
+          - {name: "User Approval Forgery", aliases: ["Confirmation Bypass", "Forged User Approval",
+                                                        "User Confirmation Bypass"]}
+          - {name: "Origin Spoofing", aliases: ["Origin Trust Abuse", "Sender Spoofing"]}
+          - {name: "Privileged Mode Switch", aliases: ["Patch Bypass"]}
+      Impact:
+        required:
+          - {name: "Data Exfiltration", aliases: ["Information Theft", "Data Theft", "Data Leakage",
+                                                    "Information Disclosure"]}
+          - {name: "Unauthorized Actions", aliases: ["Unauthorized Operations", "Actions on Behalf of User",
+                                                       "Agent Weaponization"]}
+        acceptable:
+          - {name: "AI Agent Takeover", aliases: ["Agent Hijacking", "Account Takeover", "Takeover"]}
+          - {name: "Data Destruction", aliases: ["Data Deletion"]}
+          - {name: "Privilege Escalation"}
+          - {name: "Credential Theft"}
+      VulnerabilityType:
+        required: []
+        acceptable:
+          # defensible weakness classes for an origin-vs-context trust failure
+          - {name: "CWE-346"}   # Origin Validation Error — the textbook match
+          - {name: "CWE-284"}   # Improper Access Control
+          - {name: "CWE-940"}   # Improper Verification of Source of a Communication Channel
+          - {name: "CWE-1427"}  # Improper Neutralization of Input Used for LLM Prompting
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EXCLUDED fixtures (present in fixtures/ but deliberately NOT labeled):
+#   cetas-indirect-prompt-injection — fixture is only a cookie-consent wall
+#     (654 chars, no article content). Re-crawl with a consent-aware crawler
+#     before labeling.
+#   zdnet-why-enterprise-ai — fixture captured only the header/TOC/tracking
+#     boilerplate; the article body is missing. Rebuild the fixture first.
+# The evaluator iterates over docs in THIS file, so listing them here (as
+# comments) keeps them out of the benchmark without deleting the fixtures.
+# ─────────────────────────────────────────────────────────────────────────────

@@ -1,0 +1,250 @@
+# Curated registry of AI-security data sources.
+# Loaded into SQLite (table `data_source`) on first boot or when the user
+# hits "Reload seeds" in the Sources UI. Re-running is idempotent: existing
+# rows are updated in place, seed_urls are UPSERTed into `source_url`.
+#
+# Tiers mirror PRESENTATION.md §7:
+#   1 = high-yield, structured, stable
+#   2 = AI-specific, essential
+#   3 = bounty / disclosure reports
+#   4 = vendor-authored advisories
+#   5 = academic / fresh intel
+
+sources:
+  # ─── Tier 1 ────────────────────────────────────────────────────────
+  - id: nvd
+    name: NVD — National Vulnerability Database
+    tier: 1
+    category: cve-feed
+    homepage: https://nvd.nist.gov/
+    description: Canonical CVE source; rich CVSS + CPE data.
+    discovery_type: rss
+    discovery_url: https://nvd.nist.gov/feeds/rss/nvd-cve-rss-2_0.xml
+    seed_urls:
+      - https://nvd.nist.gov/vuln/detail/CVE-2024-5184
+      - https://nvd.nist.gov/vuln/detail/CVE-2023-36258
+      - https://nvd.nist.gov/vuln/detail/CVE-2024-21626
+      - https://nvd.nist.gov/vuln/detail/CVE-2024-0243
+
+  - id: ghsa
+    name: GitHub Security Advisory Database
+    tier: 1
+    category: cve-feed
+    homepage: https://github.com/advisories
+    description: Heavy AI-framework coverage (LangChain, LlamaIndex, vLLM, HuggingFace, Ollama).
+    discovery_type: html_listing
+    discovery_url: https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip
+    seed_urls:
+      - https://github.com/advisories/GHSA-56xg-wfcc-g829
+      - https://github.com/advisories/GHSA-gjjv-cp8v-cf64
+      - https://github.com/advisories/GHSA-7gfq-f96f-g85j
+
+  - id: osv
+    name: OSV.dev — Open Source Vulnerabilities
+    tier: 1
+    category: cve-feed
+    homepage: https://osv.dev
+    description: Aggregates GHSA + NVD + PyPI + Go + Rust + npm; excellent JSON API.
+    discovery_type: api
+    discovery_url: https://api.osv.dev/v1/querybatch
+    seed_urls:
+      - https://osv.dev/vulnerability/GHSA-56xg-wfcc-g829
+      - https://osv.dev/vulnerability/PYSEC-2024-126
+
+  - id: mitre-cve
+    name: MITRE CVE
+    tier: 1
+    category: cve-feed
+    homepage: https://www.cve.org/
+    description: Upstream of NVD; earlier availability of new CVEs.
+    discovery_type: manual
+    seed_urls:
+      - https://www.cve.org/CVERecord?id=CVE-2024-5184
+
+  - id: cisa-kev
+    name: CISA Known Exploited Vulnerabilities (KEV)
+    tier: 1
+    category: exploit-intel
+    homepage: https://www.cisa.gov/known-exploited-vulnerabilities-catalog
+    description: >-
+      CVEs with CISA-verified in-the-wild exploitation. Ingested via
+      scripts/import_kev.py, which enriches existing KB vulns
+      (exploited_in_wild / exploitation_verified_date / ransomware_use)
+      rather than adding rows. JSON feed re-published on every catalog update.
+    discovery_type: api
+    discovery_url: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+
+  # ─── Tier 2 ────────────────────────────────────────────────────────
+  - id: avid
+    name: AVID — AI Vulnerability Database
+    tier: 2
+    category: ai-vuln
+    homepage: https://avidml.org/
+    description: The only vuln DB dedicated to AI failure modes.
+    discovery_type: html_listing
+    discovery_url: https://avidml.org/database/
+    seed_urls:
+      - https://avidml.org/database/avid-2024-v023/
+      - https://avidml.org/database/avid-2023-r0016/
+
+  - id: aiid
+    name: AI Incident Database (AIID)
+    tier: 2
+    category: incident
+    homepage: https://incidentdatabase.ai/
+    description: Non-CVE real-world AI incidents with journalistic write-ups.
+    discovery_type: api
+    discovery_url: https://incidentdatabase.ai/api/
+    seed_urls:
+      - https://incidentdatabase.ai/cite/1/
+      - https://incidentdatabase.ai/cite/585/
+
+  - id: atlas
+    name: MITRE ATLAS
+    tier: 2
+    category: taxonomy
+    homepage: https://atlas.mitre.org/
+    description: Adversarial ML tactics + techniques (TTPs).
+    discovery_type: manual
+    seed_urls:
+      - https://atlas.mitre.org/techniques/AML.T0051
+      - https://atlas.mitre.org/matrices/ATLAS
+
+  - id: owasp-llm-top10
+    name: OWASP LLM Top 10
+    tier: 2
+    category: taxonomy
+    homepage: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+    description: Weakness taxonomy for LLM applications.
+    discovery_type: manual
+    seed_urls:
+      - https://owasp.org/www-project-top-10-for-large-language-model-applications/
+
+  - id: owasp-ml-top10
+    name: OWASP ML Top 10
+    tier: 2
+    category: taxonomy
+    homepage: https://owasp.org/www-project-machine-learning-security-top-10/
+    description: Weakness taxonomy for classical ML systems.
+    discovery_type: manual
+    seed_urls:
+      - https://owasp.org/www-project-machine-learning-security-top-10/
+
+  # ─── Tier 3 ────────────────────────────────────────────────────────
+  - id: huntr
+    name: huntr.com — AI/ML Bug Bounties
+    tier: 3
+    category: bounty
+    homepage: https://huntr.com/
+    description: AI/ML-focused bounty reports, many with reproducers.
+    discovery_type: html_listing
+    discovery_url: https://huntr.com/bounties?state=resolved
+    seed_urls:
+      - https://huntr.com/bounties/5765b411-a693-4c4a-bd25-a0de429e5d0c
+
+  - id: protect-ai
+    name: Protect AI Threat Research
+    tier: 3
+    category: research
+    homepage: https://protectai.com/threat-research
+    description: MLSecOps-oriented CVE write-ups and original research.
+    discovery_type: html_listing
+    discovery_url: https://protectai.com/threat-research
+    seed_urls: []
+
+  - id: snyk
+    name: Snyk Vulnerability Database
+    tier: 3
+    category: cve-feed
+    homepage: https://security.snyk.io/
+    description: Adds severity + exploit-maturity info; strong package coverage.
+    discovery_type: manual
+    seed_urls:
+      - https://security.snyk.io/vuln/SNYK-PYTHON-LANGCHAIN-5752068
+      - https://security.snyk.io/vuln/SNYK-PYTHON-LLAMAINDEX-5841057
+
+  - id: patchstack
+    name: Patchstack Database
+    tier: 3
+    category: cve-feed
+    homepage: https://patchstack.com/database/
+    description: Primarily WordPress — but cross-references many AI plugins.
+    discovery_type: manual
+    seed_urls:
+      - https://patchstack.com/database/vulnerability/ai-engine
+
+  # ─── Tier 4 — vendor advisories ────────────────────────────────────
+  - id: langchain-security
+    name: LangChain Security Advisories
+    tier: 4
+    category: vendor
+    homepage: https://github.com/langchain-ai/langchain/security/advisories
+    description: Upstream advisories for the LangChain framework.
+    discovery_type: html_listing
+    discovery_url: https://github.com/langchain-ai/langchain/security/advisories
+    seed_urls: []
+
+  - id: hf-security
+    name: HuggingFace Security Blog
+    tier: 4
+    category: vendor
+    homepage: https://huggingface.co/blog/tags/security
+    description: Security-tagged posts from the HuggingFace team.
+    discovery_type: html_listing
+    discovery_url: https://huggingface.co/blog/tags/security
+    seed_urls: []
+
+  - id: nvidia-psirt
+    name: NVIDIA PSIRT
+    tier: 4
+    category: vendor
+    homepage: https://www.nvidia.com/en-us/security/
+    description: NVIDIA product security advisories (drivers, CUDA, Triton).
+    discovery_type: manual
+    seed_urls:
+      - https://nvidia.custhelp.com/app/answers/detail/a_id/5551
+      - https://nvidia.custhelp.com/app/answers/detail/a_id/5586
+
+  - id: openai-trust
+    name: OpenAI Trust Portal
+    tier: 4
+    category: vendor
+    homepage: https://trust.openai.com/
+    description: OpenAI disclosures and compliance reports.
+    discovery_type: manual
+    seed_urls:
+      - https://openai.com/security/
+
+  # ─── Tier 5 — academic / fresh intel ──────────────────────────────
+  - id: arxiv-cscr
+    name: arXiv cs.CR (AI Security filtered)
+    tier: 5
+    category: academic
+    homepage: https://arxiv.org/list/cs.CR/new
+    description: >
+      Fresh AI-security research. Use with keyword filter:
+      "prompt injection", "jailbreak", "LLM security",
+      "model extraction", "adversarial examples".
+    discovery_type: rss
+    discovery_url: http://export.arxiv.org/rss/cs.CR
+    seed_urls: []
+
+  - id: wiz-research
+    name: Wiz Research Blog
+    tier: 5
+    category: research
+    homepage: https://www.wiz.io/blog/tag/research
+    description: Cloud + AI security research write-ups.
+    discovery_type: html_listing
+    discovery_url: https://www.wiz.io/blog/tag/research
+    seed_urls: []
+
+  - id: lakera
+    name: Lakera Security Blog
+    tier: 5
+    category: research
+    homepage: https://www.lakera.ai/blog
+    description: LLM-safety-focused research.
+    discovery_type: html_listing
+    discovery_url: https://www.lakera.ai/blog
+    seed_urls: []

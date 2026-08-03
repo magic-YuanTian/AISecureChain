@@ -1,0 +1,66 @@
+# ── Secrets ──────────────────────────────────────────────────────────────
+# .env holds MISP credentials and the LLM endpoint/key. Never commit it.
+.env
+.env.local
+*.pem
+*.key
+
+# ── Vendored / cloned upstream repos ─────────────────────────────────────
+# Clones of external projects kept for reference, not our code. Together they
+# are >6GB; clone them separately rather than committing them here.
+cvelistV5/
+avid-db/
+crawl4ai/
+www-project-top-10-for-large-language-model-applications/
+mit/
+
+# ── Generated knowledge base ─────────────────────────────────────────────
+# Rebuildable: `python build_db.py` then `python build_rdf.py`.
+*.db
+*.db-wal
+*.db-shm
+*.bak
+*.db.*
+query_engine/ai_vuln_kb.ttl
+
+# ── Collected / derived data ─────────────────────────────────────────────
+output/
+*.png
+report.md
+
+# ── Benchmark artifacts ──────────────────────────────────────────────────
+# Keep gold.yaml, fixtures/ and the scripts — they ARE the benchmark.
+# Drop per-run reports and spreadsheet exports.
+query_engine/extract_eval/regression/report_*.json
+query_engine/extract_eval/regression/proposed_gold.yaml
+query_engine/extract_eval/regression/*.xlsx
+query_engine/extract_eval/regression/*.csv
+query_engine/extract_eval/regression/csv/
+query_engine/extract_eval/report*.json
+query_engine/extract_eval/bench.json
+query_engine/extract_eval/blog_results.json
+query_engine/extract_eval/*_results.json
+
+# ── Local editor / agent settings ────────────────────────────────────────
+# Machine-specific and may embed private ids from past commands.
+.claude/
+.cursorignore
+
+# ── Python ───────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# ── Node / frontend ──────────────────────────────────────────────────────
+node_modules/
+query_engine/frontend/build/
+npm-debug.log*
+
+# ── Editors / OS ─────────────────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+*.swp

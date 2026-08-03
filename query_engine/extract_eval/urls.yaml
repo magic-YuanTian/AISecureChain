@@ -1,0 +1,181 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# AISecureChain — Extraction pipeline test URLs + gold expectations
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Each entry defines what the pipeline should find on a given URL, so that
+# `evaluate.py` can compute per-URL recall/precision/coverage.
+#
+# Categories:
+#   single-cve   : one vulnerability on the page, strong expected ID
+#   multi-cve    : listing pages (blog, advisory index, release notes)
+#   software     : software/project page (no vuln needed; Vendor+Software expected)
+#   partial      : page where we expect partial records / failure modes
+#
+# Expected fields (all optional; omit what you don't want to check):
+#   vulnerability_ids       : list[str]   canonical IDs that must ALL appear
+#   forbidden_ids           : list[str]   IDs that must NOT appear (anti-hallucination)
+#   min_vulnerabilities     : int         minimum count of Vulnerability entities
+#   min_vendors             : int
+#   min_software            : int
+#   min_versions            : int
+#   min_vulnerability_types : int
+#   must_have_classes       : list[str]   every listed ontology class must appear
+#   max_partial_rate        : float       0-1, upper bound on partial_rate
+#
+# NOTE: Update IDs as you add/remove URLs. For listing pages, use a subset of
+# IDs you are confident the page actually contains.
+# ─────────────────────────────────────────────────────────────────────────────
+
+urls:
+  # ── Single CVE detail pages ─────────────────────────────────────────────
+  - url: https://nvd.nist.gov/vuln/detail/CVE-2024-5184
+    source: NVD
+    category: single-cve
+    notes: Salesforce EmailGPT prompt-injection
+    expected:
+      vulnerability_ids: [CVE-2024-5184]
+      min_vendors: 1
+      min_software: 1
+      must_have_classes: [Vulnerability, Vendor, Software]
+      max_partial_rate: 0.5
+
+  - url: https://nvd.nist.gov/vuln/detail/CVE-2023-29374
+    source: NVD
+    category: single-cve
+    notes: LangChain prompt injection (NVD page omits vendor field)
+    expected:
+      vulnerability_ids: [CVE-2023-29374]
+      min_software: 1
+      must_have_classes: [Vulnerability, Software]
+
+  - url: https://nvd.nist.gov/vuln/detail/CVE-2023-36258
+    source: NVD
+    category: single-cve
+    notes: LangChain PALChain command injection
+    expected:
+      vulnerability_ids: [CVE-2023-36258]
+      must_have_classes: [Vulnerability, Software]
+
+  # ── GitHub Security Advisories ──────────────────────────────────────────
+  - url: https://github.com/advisories/GHSA-7gfq-f96f-g85j
+    source: GitHub
+    category: single-cve
+    notes: LangChain SSRF
+    expected:
+      vulnerability_ids: [GHSA-7gfq-f96f-g85j]
+      must_have_classes: [Vulnerability, Software]
+
+  - url: https://github.com/advisories/GHSA-56xg-wfcc-g829
+    source: GitHub
+    category: single-cve
+    notes: LangChain SQL injection
+    expected:
+      vulnerability_ids: [GHSA-56xg-wfcc-g829]
+
+  # ── AVID records ────────────────────────────────────────────────────────
+  - url: https://avidml.org/database/avid-2023-v013/
+    source: AVID
+    category: single-vuln
+    notes: AI-specific advisory
+    expected:
+      vulnerability_ids: [AVID-2023-V013]
+      must_have_classes: [Vulnerability]
+
+  # ── Multi-record listing pages ──────────────────────────────────────────
+  - url: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+    source: OWASP LLM Top 10
+    category: taxonomy
+    notes: Taxonomy page, expect many VulnerabilityType-like concepts
+    expected:
+      min_vulnerability_types: 5
+
+  # ── Technical blog writeups ─────────────────────────────────────────────
+  # Hand-vetted set: each URL was crawled + run through the full pipeline.
+  # `vuln_id` is intentionally absent for most of these — research blogs
+  # describe a named attack/finding, not a public CVE. We instead assert
+  # presence of Vendor / Software / VulnerabilityType (CWE) classes.
+
+  - url: https://embracethered.com/blog/posts/2024/chatgpt-hacking-memories/
+    source: Embrace The Red
+    category: tech-blog
+    notes: Indirect prompt-injection abuses ChatGPT long-term memory
+    expected:
+      must_have_classes: [Vendor, Software, Vulnerability]
+      min_software: 2
+      max_partial_rate: 0.2
+
+  - url: https://embracethered.com/blog/posts/2024/google-colab-image-render-exfil/
+    source: Embrace The Red
+    category: tech-blog
+    notes: Zero-click data exfil via image rendering in Colab AI / Gemini
+    expected:
+      must_have_classes: [Vendor, Software, Vulnerability]
+      min_software: 3
+      max_partial_rate: 0.2
+
+  - url: https://embracethered.com/blog/posts/2024/m365-copilot-prompt-injection-tool-invocation-and-data-exfil-using-ascii-smuggling/
+    source: Embrace The Red
+    category: tech-blog
+    notes: M365 Copilot prompt injection + ASCII smuggling exfil
+    expected:
+      must_have_classes: [Vendor, Software, Vulnerability, VulnerabilityType]
+      min_vulnerability_types: 3
+      max_partial_rate: 0.2
+
+  - url: https://embracethered.com/blog/posts/2023/chatgpt-cross-plugin-request-forgery-and-prompt-injection./
+    source: Embrace The Red
+    category: tech-blog
+    notes: Cross-plugin request forgery via prompt injection
+    expected:
+      must_have_classes: [Vendor, Software, Vulnerability, VulnerabilityType]
+      min_vendors: 1
+      max_partial_rate: 0.2
+
+  - url: https://hiddenlayer.com/innovation-hub/shadowlogic/
+    source: HiddenLayer
+    category: tech-blog
+    notes: ShadowLogic — backdoors in computational graphs (PyTorch, ONNX, TF)
+    expected:
+      must_have_classes: [Vendor, Software, VulnerabilityType]
+      min_vulnerability_types: 2
+      min_software: 5
+
+  - url: https://hiddenlayer.com/innovation-hub/the-dark-side-of-large-language-models/
+    source: HiddenLayer
+    category: tech-blog
+    notes: LLM threat survey — prompt injection, data leakage, etc.
+    expected:
+      must_have_classes: [Vendor, Software, VulnerabilityType]
+      min_vulnerability_types: 4
+      min_software: 5
+
+  - url: https://www.lakera.ai/blog/jailbreaking-large-language-models-guide
+    source: Lakera
+    category: tech-blog
+    notes: Jailbreak taxonomy — heavy VulnerabilityType signal
+    expected:
+      must_have_classes: [Vendor, Software, VulnerabilityType]
+      min_vulnerability_types: 8
+
+  - url: https://www.lakera.ai/blog/visual-prompt-injections
+    source: Lakera
+    category: tech-blog
+    notes: Visual / multimodal prompt injection writeup
+    expected:
+      must_have_classes: [Vendor, Software, VulnerabilityType]
+      min_vulnerability_types: 4
+
+  - url: https://blog.trailofbits.com/2024/06/11/exploiting-ml-models-with-pickle-file-attacks-part-1/
+    source: Trail of Bits
+    category: tech-blog
+    notes: Pickle-file attacks against ML models (Sleepy Pickle, Fickling)
+    expected:
+      must_have_classes: [Vendor, Software, VulnerabilityType]
+      min_software: 5
+
+  # Notes on URLs that did *not* make the cut (kept for transparency):
+  #   * jfrog.com/blog/* — site reorganised, all tested URLs 404
+  #   * protectai.com/blog/<vuln-report> — marketing wrapper, 0 CVEs in markdown
+  #   * hiddenlayer.com/innovation-hub/sleepy-pickle/ — now 404
+  #   * hiddenlayer.com/innovation-hub/breaking-the-memory-barrier-… — JS-only body
+  #   * snyk.io/blog/llm-data-leakage-… — newsletter wrapper, marketing-only md

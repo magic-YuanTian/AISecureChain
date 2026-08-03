@@ -274,7 +274,7 @@ Remaining known weaknesses:
 Run with the evaluation pipeline untouched — only the LLM env vars change:
 
 ```bash
-# serve the open model (6-way data parallel; see scratchpad/serve_qwen.sh)
+# serve the open model — one replica per free GPU behind one endpoint
 vllm serve Qwen/Qwen3.5-4B --data-parallel-size 6 --max-model-len 16384 --max-num-seqs 16
 
 AISC_LLM_PROVIDER=openai AISC_LLM_ENDPOINT=http://localhost:8077/v1 \

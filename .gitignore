@@ -45,6 +45,18 @@ query_engine/extract_eval/*_results.json
 # Machine-specific and may embed private ids from past commands.
 .claude/
 .cursorignore
+CLAUDE.md
+.aider*
+.github/copilot-instructions.md
+
+# ── Working notes, not documentation ─────────────────────────────────────
+# Dated work logs, progress summaries and slide decks belong in a notebook,
+# not in the repository. Durable docs go in README.md next to what they cover.
+UPDATES_*.md
+PRESENTATION*.md
+*_SUMMARY.md
+NOTES.md
+TODO.md
 
 # ── Python ───────────────────────────────────────────────────────────────
 __pycache__/

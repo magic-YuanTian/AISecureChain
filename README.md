@@ -60,11 +60,13 @@ cp .env.example .env
 Then edit `.env`. The LLM block is the only part required to run the system:
 
 ```ini
-AISC_LLM_PROVIDER=azure                      # or "openai" for any OpenAI-compatible server
-AISC_LLM_ENDPOINT=https://<your-endpoint>/   # base URL
+AISC_LLM_ENDPOINT=https://<your-endpoint>/   # empty → api.openai.com
 AISC_LLM_API_KEY=<your-key>
 AISC_LLM_MODEL=gpt-4o
 ```
+
+Azure endpoints are detected automatically; anything else is treated as an
+OpenAI-compatible server.
 
 `.env` is git-ignored. Anything already exported in your shell overrides it,
 which is how you point a single run at a different model:
@@ -77,17 +79,24 @@ AISC_LLM_MODEL=gpt-4.1-mini python -m extract_eval.regression.evaluate_regressio
 <summary>Using a local open-weight model instead (vLLM)</summary>
 
 ```bash
-vllm serve Qwen/Qwen3.5-9B --port 8000 --max-model-len 16384
+vllm serve Qwen/Qwen3.5-9B --port 8000 --max-model-len 16384 --max-num-seqs 8
 
 # .env
-AISC_LLM_PROVIDER=openai
 AISC_LLM_ENDPOINT=http://localhost:8000/v1
 AISC_LLM_API_KEY=dummy
 AISC_LLM_MODEL=Qwen/Qwen3.5-9B
-AISC_LLM_MAX_TOKENS=4096
-# reasoning models: return plain JSON instead of chain of thought
-AISC_LLM_EXTRA_BODY={"chat_template_kwargs":{"enable_thinking":false}}
 ```
+
+Two things worth knowing if you go this route:
+
+- **Reasoning models** (Qwen3.x, DeepSeek-R1) emit chain of thought before the
+  answer, and that text contains braces which break JSON parsing. Fix it on the
+  server, not in the client: `vllm serve … --reasoning-parser qwen3` puts the
+  reasoning in a separate field. (`extract_pipeline/llm.py` also strips stray
+  `<think>` blocks as a backstop.)
+- **Declared context size costs memory.** vLLM reserves KV cache per sequence,
+  so `--max-model-len 32768` under concurrency will OOM a 24GB card. The real
+  prompt here is ~5k tokens; 16384 is ample.
 </details>
 
 Verify the LLM layer before going further:
@@ -200,15 +209,16 @@ python -m extract_eval.regression.compare_models a=report_a.json b=report_b.json
 
 | Variable | Purpose |
 |----------|---------|
-| `AISC_LLM_PROVIDER` | `azure` (default) or `openai` for any OpenAI-compatible server |
-| `AISC_LLM_ENDPOINT` | Azure endpoint or compatible server base URL |
-| `AISC_LLM_API_KEY` | API key |
-| `AISC_LLM_API_VERSION` | Azure API version |
+| `AISC_LLM_ENDPOINT` | Base URL. Azure endpoints are auto-detected; empty → api.openai.com |
+| `AISC_LLM_API_KEY` | API key (`dummy` is fine for a local vLLM/Ollama) |
 | `AISC_LLM_MODEL` | Deployment / model name |
-| `AISC_LLM_MAX_TOKENS` | Optional generation cap — self-hosted servers often default low |
-| `AISC_LLM_EXTRA_BODY` | Optional JSON forwarded as OpenAI `extra_body` for vendor switches |
 | `MISP_URL`, `MISP_API_KEY`, `MISP_VERIFY_SSL` | Only for `explore_misp.py` |
 | `AISC_SHEET_ID`, `AISC_SHEET_GID` | Optional: push benchmark results to a Google Sheet |
+
+Need a provider that does not speak the OpenAI protocol (Anthropic, Bedrock, an
+internal gateway)? Rewrite the body of `get_response()` in
+`query_engine/utils/openai_api.py`. It is the only LLM call site in the project,
+and its contract is documented in that function's docstring.
 
 ## Troubleshooting
 

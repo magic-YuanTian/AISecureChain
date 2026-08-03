@@ -1,12 +1,53 @@
 # AISecureChain
 
-An AI/ML vulnerability knowledge base. It collects security advisories, uses an
-LLM to extract a structured ontology from them, stores the result as both a
-relational database and an RDF graph, and serves it through a REST/SPARQL API
-with a React front end.
+**A knowledge graph of AI/ML supply-chain vulnerabilities.**
 
-The extraction quality is measured by an oracle-labeled regression benchmark
-that is part of this repository — see [Evaluation](#5-evaluation-optional).
+> **[Live demo →](http://18.207.218.62:3508/)**
+
+Security knowledge about AI systems is scattered across CVE records, vendor
+advisories, threat-intel feeds and research write-ups, almost all of it prose.
+AISecureChain turns that prose into a queryable graph: it crawls the sources,
+uses an LLM to extract entities and relations against a fixed ontology, resolves
+duplicates, and stores the result as both a relational database and RDF — served
+through a REST and SPARQL API with a React front end.
+
+What distinguishes AI vulnerabilities from ordinary ones is that the interesting
+part is often *causal* rather than structural: not just "which version is
+affected", but how an attack reaches the model and what an attacker gets out of
+it. The ontology is built around that chain:
+
+```
+Attack ──exploits──▶ Vulnerability ──resultsIn──▶ Impact
+                            ▲
+                     vulnerableTo
+                            │
+        Vendor ──produce──▶ Software ──hasVersion──▶ Version
+```
+
+Nine classes in namespace `http://aisecurechain.org/ontology#`. `Attack` and
+`Impact` are extracted per advisory rather than drawn from a fixed catalogue,
+because the techniques in this space are still being named.
+
+Extraction quality is not asserted — it is measured. The repository ships an
+oracle-labelled regression benchmark over frozen page snapshots, so any change
+to the pipeline or the underlying model can be scored; see
+[Evaluation](#6-evaluation-optional).
+
+## Context
+
+AISecureChain is the AI/ML arm of a broader effort on software supply-chain
+security:
+
+| | |
+|---|---|
+| **Research project** | [Knowledge Graph for Software Supply Chain Security](https://purdue-hcss.github.io/nsf-software-supply-chain_security/) — NSF-funded, Purdue University with USC and UC Davis |
+| **Companion repository** | [purdue-hcss/SecureChain](https://github.com/purdue-hcss/SecureChain) — the same idea for **traditional** software: a cross-ecosystem graph of packages, hardware, dependencies and CVE/CWE drawn from Debian, ConanCenter, deps.dev, NVD and CPE |
+
+The two are complementary. SecureChain answers *what depends on what, and which
+of it is vulnerable* across conventional ecosystems. AISecureChain covers the
+part that classic dependency analysis cannot reach — prompt injection, model
+poisoning, agent misuse and similar failures, where the vulnerability lives in
+model behaviour and the evidence exists only as narrative text.
 
 ---
 
@@ -23,9 +64,9 @@ that is part of this repository — see [Evaluation](#5-evaluation-optional).
 | `query_engine/extract_eval/regression/` | The extraction benchmark: frozen fixtures, gold labels, scorer |
 | `explore_misp.py`, `fetch_cve_details.py` | Data collection from MISP and cvelistV5 |
 
-Ontology namespace `http://aisecurechain.org/ontology#`, nine classes. The core
-causal chain is `Attack —exploits→ Vulnerability —resultsIn→ Impact`, with
-`Vendor → Software → Version` on the asset side.
+The ontology schema itself lives in `query_engine/ai_vuln_kb.ttl` and is loaded
+at runtime: adding a class or property there propagates automatically into the
+extraction prompt, the RDF serialisation and the API endpoints.
 
 ---
 

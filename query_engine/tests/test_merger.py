@@ -74,6 +74,23 @@ def test_missing_required_flags_partial():
     assert ents2[0].attributes.get("_minted_id") is True
 
 
+def test_software_is_ai_false_is_not_partial():
+    """Boolean false must count as present — Non-AI software is valid."""
+    g = ExtractionGraph(
+        entities=[
+            _mk("Vendor", "v", name="HumanSignal"),
+            _mk("Software", "s", name="label-studio", is_ai=False, software_type="Application"),
+        ],
+        relations=[ExtractedRelation(predicate="produce", subject="v", object="s")],
+    )
+    ents, _ = merge_graphs([g])
+    software = [e for e in ents if e.class_name == "Software"]
+    assert len(software) == 1
+    assert software[0].attributes["is_ai"] is False
+    assert software[0].is_partial is False
+    assert software[0].partial_reasons == []
+
+
 def test_minted_vuln_id_is_deterministic():
     g1 = ExtractionGraph(entities=[_mk("Vulnerability", "v", title="Indirect prompt injection in Foo")])
     g2 = ExtractionGraph(entities=[_mk("Vulnerability", "v", title="Indirect prompt injection in Foo")])

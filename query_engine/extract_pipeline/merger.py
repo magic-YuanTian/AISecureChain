@@ -353,10 +353,20 @@ def merge_graphs(
                 ))
             canonical_rels = rewritten
 
-    # Pass 3: flag partial entities (missing required attributes)
+    # Pass 3: flag partial entities (missing required attributes).
+    # Treat only None / blank string as missing — False and 0 are real values
+    # (e.g. Software.is_ai=False must not be flagged partial).
+    def _attr_missing(attrs: dict, key: str) -> bool:
+        val = attrs.get(key)
+        if val is None:
+            return True
+        if isinstance(val, str) and not val.strip():
+            return True
+        return False
+
     for ent in merged.values():
         reqs = required_attributes(ent.class_name)
-        missing = [a for a in reqs if not ent.attributes.get(a)]
+        missing = [a for a in reqs if _attr_missing(ent.attributes, a)]
         if missing:
             ent.is_partial = True
             ent.partial_reasons = [f"missing:{a}" for a in missing]

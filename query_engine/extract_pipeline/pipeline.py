@@ -140,10 +140,16 @@ async def run_pipeline_from_markdown(
 
     # 3. Extract (parallelised)
     system_prompt = build_system_prompt()
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from utils.openai_api import empty_usage, merge_usage  # type: ignore
 
-    async def _one(ci: int, chunk: str) -> tuple[int, ExtractionGraph, str | None]:
-        g, e = await extract_graph(chunk, system_prompt=system_prompt)
-        return ci, g, e
+    extract_usage = empty_usage()
+
+    async def _one(ci: int, chunk: str) -> tuple[int, ExtractionGraph, str | None, dict]:
+        g, e, u = await extract_graph(chunk, system_prompt=system_prompt)
+        return ci, g, e, u
 
     outs = await asyncio.gather(
         *[_one(i, c) for i, c in enumerate(chunks)],
@@ -154,7 +160,8 @@ async def run_pipeline_from_markdown(
         if isinstance(out, Exception):
             result.errors.append(f"chunk extraction failed: {out}")
             continue
-        ci, g, e = out  # type: ignore[assignment]
+        ci, g, e, u = out  # type: ignore[assignment]
+        extract_usage = merge_usage(extract_usage, u)
         if e:
             result.warnings.append(f"chunk {ci}: {e}")
         if g.entities or g.relations:
@@ -163,6 +170,11 @@ async def run_pipeline_from_markdown(
 
     if not result.raw_graphs:
         result.errors.append("No extractions from any chunk.")
+        result.llm_usage = {
+            "extraction": extract_usage,
+            "validation": empty_usage(),
+            "total": extract_usage,
+        }
         return result
 
     # 4. Merge
@@ -175,6 +187,7 @@ async def run_pipeline_from_markdown(
         canonical_entities,
         canonical_relations,
         validation_warnings,
+        validation_usage,
     ) = await validate_and_map_vulnerability_types(
         canonical_entities,
         canonical_relations,
@@ -184,6 +197,11 @@ async def run_pipeline_from_markdown(
     result.canonical_entities = canonical_entities
     result.canonical_relations = canonical_relations
     result.warnings.extend(validation_warnings)
+    result.llm_usage = {
+        "extraction": extract_usage,
+        "validation": validation_usage,
+        "total": merge_usage(extract_usage, validation_usage),
+    }
 
     # 5.5 Deterministic precision filters (generic categories, CVSS labels,
     #     defense-only software, unlinked non-standard Attack/Impact)

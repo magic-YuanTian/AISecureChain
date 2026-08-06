@@ -25,6 +25,7 @@ replace the body of :func:`get_response` — the contract is documented there.
 from __future__ import annotations
 
 import os
+from typing import Any
 
 _ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".env")
 
@@ -69,6 +70,100 @@ class LLMNotConfigured(RuntimeError):
         )
 
 
+def empty_usage() -> dict[str, Any]:
+    return {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+        "cost": None,
+        "calls": 0,
+    }
+
+
+def merge_usage(*parts: dict[str, Any] | None) -> dict[str, Any]:
+    out = empty_usage()
+    cost_sum = 0.0
+    saw_cost = False
+    for part in parts:
+        if not part:
+            continue
+        out["prompt_tokens"] += int(part.get("prompt_tokens") or 0)
+        out["completion_tokens"] += int(part.get("completion_tokens") or 0)
+        out["total_tokens"] += int(part.get("total_tokens") or 0)
+        out["calls"] += int(part.get("calls") or 0)
+        if part.get("cost") is not None:
+            cost_sum += float(part["cost"])
+            saw_cost = True
+    out["cost"] = cost_sum if saw_cost else None
+    return out
+
+
+def _usage_from_completion(completion: Any) -> dict[str, Any]:
+    usage = empty_usage()
+    usage["calls"] = 1
+    u = getattr(completion, "usage", None)
+    if u is None:
+        return usage
+    usage["prompt_tokens"] = int(getattr(u, "prompt_tokens", 0) or 0)
+    usage["completion_tokens"] = int(getattr(u, "completion_tokens", 0) or 0)
+    usage["total_tokens"] = int(getattr(u, "total_tokens", 0) or 0)
+    cost = getattr(u, "cost", None)
+    if cost is None:
+        extra = getattr(u, "model_extra", None) or {}
+        if isinstance(extra, dict):
+            cost = extra.get("cost")
+    if cost is None:
+        dump = getattr(u, "model_dump", None)
+        if callable(dump):
+            try:
+                cost = dump().get("cost")
+            except Exception:
+                cost = None
+    if cost is not None:
+        try:
+            usage["cost"] = float(cost)
+        except (TypeError, ValueError):
+            usage["cost"] = None
+    if usage["total_tokens"] == 0:
+        usage["total_tokens"] = usage["prompt_tokens"] + usage["completion_tokens"]
+    return usage
+
+
+def get_response_with_usage(
+    messages: list[dict],
+    temperature: float = 0,
+    *,
+    model: str | None = None,
+    endpoint: str | None = None,
+    api_key: str | None = None,
+) -> tuple[str, dict[str, Any]]:
+    """Send a chat request; return ``(text, usage)``."""
+    endpoint = endpoint if endpoint is not None else os.environ.get("AISC_LLM_ENDPOINT", "")
+    api_key = api_key if api_key is not None else os.environ.get("AISC_LLM_API_KEY", "")
+    model = model if model is not None else os.environ.get("AISC_LLM_MODEL", "gpt-4o")
+    if not api_key:
+        raise LLMNotConfigured()
+
+    from openai import AzureOpenAI, OpenAI
+    from tenacity import retry, stop_after_attempt, wait_random_exponential
+
+    @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+    def _call() -> tuple[str, dict[str, Any]]:
+        if "azure" in (endpoint or ""):
+            client = AzureOpenAI(azure_endpoint=endpoint, api_key=api_key,
+                                 api_version=_AZURE_API_VERSION)
+        else:
+            client = OpenAI(api_key=api_key, base_url=endpoint or None)
+        completion = client.chat.completions.create(
+            model=model, messages=messages, temperature=temperature,
+        )
+        msg = completion.choices[0].message
+        text = msg.content or getattr(msg, "reasoning_content", None) or ""
+        return text, _usage_from_completion(completion)
+
+    return _call()
+
+
 def get_response(
     messages: list[dict],
     temperature: float = 0,
@@ -88,43 +183,20 @@ def get_response(
     Optional model / endpoint / api_key kwargs override AISC_LLM_* for a
     single call (used by the regression FP judge via AISC_JUDGE_*).
 
-    Swap in another provider by rewriting this body; nothing else changes.
+    For token/cost tracing use :func:`get_response_with_usage`.
     """
-    endpoint = endpoint if endpoint is not None else os.environ.get("AISC_LLM_ENDPOINT", "")
-    api_key = api_key if api_key is not None else os.environ.get("AISC_LLM_API_KEY", "")
-    model = model if model is not None else os.environ.get("AISC_LLM_MODEL", "gpt-4o")
-    if not api_key:
-        raise LLMNotConfigured()
-
-    from openai import AzureOpenAI, OpenAI
-    from tenacity import retry, stop_after_attempt, wait_random_exponential
-
-    @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-    def _call() -> str:
-        if "azure" in (endpoint or ""):
-            # Azure speaks the same protocol but on a different URL layout, so
-            # it needs its own client. The api-version is a protocol constant,
-            # not something worth configuring.
-            client = AzureOpenAI(azure_endpoint=endpoint, api_key=api_key,
-                                 api_version=_AZURE_API_VERSION)
-        else:
-            # api.openai.com when endpoint is empty; otherwise any
-            # OpenAI-compatible server (vLLM, Ollama, LM Studio, …).
-            client = OpenAI(api_key=api_key, base_url=endpoint or None)
-        completion = client.chat.completions.create(
-            model=model, messages=messages, temperature=temperature,
-        )
-        msg = completion.choices[0].message
-        # Reasoning models served with a parser put chain of thought in
-        # `reasoning_content` and leave `content` clean; fall back to it so a
-        # reply is never None.
-        return msg.content or getattr(msg, "reasoning_content", None) or ""
-
-    return _call()
+    text, _usage = get_response_with_usage(
+        messages,
+        temperature=temperature,
+        model=model,
+        endpoint=endpoint,
+        api_key=api_key,
+    )
+    return text
 
 
 def get_judge_response(messages: list[dict], temperature: float = 0) -> str:
-    """Chat call for the regression FP auditor.
+    """Chat call for the regression FP auditor (text only).
 
     Uses AISC_JUDGE_MODEL (and optional AISC_JUDGE_ENDPOINT / AISC_JUDGE_API_KEY)
     when set; otherwise falls back to the main AISC_LLM_* settings.

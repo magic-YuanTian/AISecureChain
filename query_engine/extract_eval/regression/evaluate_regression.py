@@ -114,6 +114,7 @@ async def run_one(doc_id: str, gold_doc: dict, manifest: dict, source: str, max_
         scores[cname] = score_class(cname, gold_cls, pred.get(cname, []))
     meta["entity_counts"] = result.entity_counts_by_class()
     meta["relation_counts"] = _relation_counts(result)
+    meta["llm_usage"] = result.llm_usage or {}
     meta["predicted"] = {c: [p.get("name") or p.get("vuln_id") or p.get("title") for p in pred[c]] for c in pred}
     meta["details"] = _build_details(gold_doc, pred)
     return doc_id, scores, meta
@@ -213,6 +214,43 @@ def print_report(per_doc_meta: dict, per_doc_scores: dict, agg: dict, cfg: dict)
         m = _doc_totals(scores)
         flag = "  ! " + ";".join(meta["pipeline_errors"])[:40] if meta.get("pipeline_errors") else ""
         print(f"{doc_id:<42}{_fmt(m['precision']):>7}{_fmt(m['recall']):>7}{_fmt(m['f1']):>7}{flag}")
+
+    print("\nLLM usage (extract + validate; free-tier cost often 0)")
+    print(f"{'document':<42}{'stage':<10}{'calls':>6}{'prompt':>8}{'compl':>8}{'total':>8}{'cost':>10}")
+    print("-" * 92)
+    tot_ext = tot_val = 0
+    cost_ext = cost_val = 0.0
+    saw_ext = saw_val = False
+    for doc_id, scores in per_doc_scores.items():
+        meta = per_doc_meta[doc_id]
+        if not scores:
+            continue
+        usage = meta.get("llm_usage") or {}
+        for stage, key in (("extract", "extraction"), ("validate", "validation")):
+            u = usage.get(key) or {}
+            calls = int(u.get("calls") or 0)
+            prompt = int(u.get("prompt_tokens") or 0)
+            compl = int(u.get("completion_tokens") or 0)
+            total = int(u.get("total_tokens") or 0)
+            cost = u.get("cost")
+            cost_s = f"{float(cost):.4f}" if cost is not None else "-"
+            print(f"{doc_id:<42}{stage:<10}{calls:>6}{prompt:>8}{compl:>8}{total:>8}{cost_s:>10}")
+            if key == "extraction":
+                tot_ext += total
+                if cost is not None:
+                    cost_ext += float(cost)
+                    saw_ext = True
+            else:
+                tot_val += total
+                if cost is not None:
+                    cost_val += float(cost)
+                    saw_val = True
+    parts = [f"extract_tok={tot_ext}", f"validate_tok={tot_val}"]
+    if saw_ext:
+        parts.append(f"extract_cost={cost_ext:.6f}")
+    if saw_val:
+        parts.append(f"validate_cost={cost_val:.6f}")
+    print(f"suite total: {'  '.join(parts)}")
     print("=" * 78 + "\n")
 
 

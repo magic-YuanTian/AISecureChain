@@ -386,10 +386,18 @@ async def _llm_validation_decisions(
     source_text: str,
     vulnerabilities: list[CanonicalEntity],
     candidates_by_vuln: dict[str, list[PredefinedVulnerabilityType]],
-) -> dict[str, dict[str, Any]]:
-    """Ask the LLM to validate vulnerability records and choose allowed types."""
+) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+    """Ask the LLM to validate vulnerability records and choose allowed types.
+
+    Returns ``(decisions_by_key, usage)``.
+    """
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from utils.openai_api import empty_usage  # type: ignore
+
     if not vulnerabilities:
-        return {}
+        return {}, empty_usage()
 
     from .llm import _call_llm  # local import avoids making llm import validator
 
@@ -463,16 +471,16 @@ async def _llm_validation_decisions(
     ]
 
     try:
-        raw = await asyncio.to_thread(_call_llm, messages, 0.0)
+        raw, usage = await asyncio.to_thread(_call_llm, messages, 0.0)
     except Exception:
-        return {}
+        return {}, empty_usage()
 
     parsed = _parse_validation_json(raw)
     if not parsed:
-        return {}
+        return {}, usage
     rows = parsed.get("vulnerabilities")
     if not isinstance(rows, list):
-        return {}
+        return {}, usage
 
     decisions: dict[str, dict[str, Any]] = {}
     for row in rows:
@@ -481,7 +489,7 @@ async def _llm_validation_decisions(
         key = row.get("key")
         if isinstance(key, str):
             decisions[key] = row
-    return decisions
+    return decisions, usage
 
 
 async def validate_and_map_vulnerability_types(
@@ -490,11 +498,24 @@ async def validate_and_map_vulnerability_types(
     *,
     source_text: str,
     source_url: str = "",
-) -> tuple[list[CanonicalEntity], list[CanonicalRelation], list[str]]:
-    """Validate final extraction and force every Vulnerability to a predefined type."""
+) -> tuple[list[CanonicalEntity], list[CanonicalRelation], list[str], dict[str, Any]]:
+    """Validate final extraction and force every Vulnerability to a predefined type.
+
+    Returns ``(entities, relations, warnings, validation_usage)``.
+    """
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from utils.openai_api import empty_usage  # type: ignore
+
     registry = predefined_vulnerability_types()
     if not registry:
-        return entities, relations, ["No predefined VulnerabilityType registry found; skipped type mapping."]
+        return (
+            entities,
+            relations,
+            ["No predefined VulnerabilityType registry found; skipped type mapping."],
+            empty_usage(),
+        )
 
     warnings: list[str] = []
     vulnerabilities = [e for e in entities if e.class_name == "Vulnerability"]
@@ -505,7 +526,9 @@ async def validate_and_map_vulnerability_types(
         text = _entity_text(vuln)
         candidates_by_vuln[vuln.canonical_key] = _candidate_types(text, registry)
 
-    decisions = await _llm_validation_decisions(source_text, vulnerabilities, candidates_by_vuln)
+    decisions, validation_usage = await _llm_validation_decisions(
+        source_text, vulnerabilities, candidates_by_vuln
+    )
 
     keep_vuln_keys: set[str] = set()
     mapped_type_by_vuln: dict[str, str] = {}
@@ -542,7 +565,7 @@ async def validate_and_map_vulnerability_types(
         mapped_type_by_vuln[vuln.canonical_key] = chosen
 
     if not vulnerabilities:
-        return entities, relations, warnings
+        return entities, relations, warnings, validation_usage
 
     surviving_vuln_ids: set[int] = set()
     key_rewrites: dict[str, str] = {}
@@ -686,4 +709,4 @@ async def validate_and_map_vulnerability_types(
         rel for rel in new_relations
         if rel.subject_key in valid_keys and rel.object_key in valid_keys
     ]
-    return new_entities, new_relations, warnings
+    return new_entities, new_relations, warnings, validation_usage

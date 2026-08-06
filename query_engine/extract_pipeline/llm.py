@@ -433,18 +433,20 @@ def _filter_unsupported_inferences(graph: dict[str, Any], chunk: str) -> dict[st
 
 # ── LLM call wrapper ───────────────────────────────────────────────────────
 
-def _call_llm(messages: list[dict[str, str]], temperature: float = 0.0) -> str:
+def _call_llm(
+    messages: list[dict[str, str]], temperature: float = 0.0
+) -> tuple[str, dict]:
     """
-    Delegates to query_engine.utils.openai_api.get_response.
+    Delegates to get_response_with_usage.
     Kept synchronous — extract_graph will wrap it with asyncio.to_thread.
+    Returns (reply_text, usage).
     """
-    # local import so the package doesn't hard-fail at import time
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from utils.openai_api import get_response  # type: ignore
+    from utils.openai_api import get_response_with_usage  # type: ignore
 
-    return get_response(messages, temperature=temperature)
+    return get_response_with_usage(messages, temperature=temperature)
 
 
 async def extract_graph(
@@ -453,8 +455,13 @@ async def extract_graph(
     system_prompt: str | None = None,
     temperature: float = 0.0,
     retries: int = 1,
-) -> tuple[ExtractionGraph, str | None]:
-    """Run the LLM on a single chunk. Returns (graph, error_message)."""
+) -> tuple[ExtractionGraph, str | None, dict]:
+    """Run the LLM on a single chunk. Returns (graph, error_message, usage)."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from utils.openai_api import empty_usage, merge_usage  # type: ignore
+
     sys_prompt = system_prompt or build_system_prompt()
     user_msg = (
         "Extract all ontology entities and relations from the following "
@@ -462,6 +469,7 @@ async def extract_graph(
     )
 
     last_err: str | None = None
+    usage_acc = empty_usage()
     for attempt in range(retries + 1):
         messages = [
             {"role": "system", "content": sys_prompt},
@@ -478,7 +486,8 @@ async def extract_graph(
             })
 
         try:
-            raw = await asyncio.to_thread(_call_llm, messages, temperature)
+            raw, call_usage = await asyncio.to_thread(_call_llm, messages, temperature)
+            usage_acc = merge_usage(usage_acc, call_usage)
         except Exception as e:  # noqa: BLE001
             last_err = f"LLM call failed: {e}"
             continue
@@ -493,9 +502,9 @@ async def extract_graph(
         shaped = _filter_unsupported_inferences(_normalize_graph(parsed), chunk)
         try:
             graph = ExtractionGraph.model_validate(shaped)
-            return graph, None
+            return graph, None, usage_acc
         except ValidationError as e:
             last_err = f"Schema validation failed: {e}"
             continue
 
-    return ExtractionGraph(), last_err
+    return ExtractionGraph(), last_err, usage_acc

@@ -94,6 +94,8 @@ class PipelineResult(BaseModel):
     db_stats: Optional[dict[str, int]] = None
     errors: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    # extract = sum over chunks; validation = one call per URL; total = both
+    llm_usage: dict[str, Any] = Field(default_factory=dict)
 
     # ── Derived helpers ──
 

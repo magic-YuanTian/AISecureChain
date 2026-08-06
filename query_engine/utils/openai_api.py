@@ -13,7 +13,9 @@ touching this one function.
 
     AISC_LLM_ENDPOINT   base URL of your LLM server
     AISC_LLM_API_KEY    your key ("dummy" is fine for a local vLLM/Ollama)
-    AISC_LLM_MODEL      model name, e.g. gpt-4o or Qwen/Qwen3.5-9B
+    AISC_LLM_MODEL      model name for extraction / validate (e.g. gpt-4o)
+    AISC_JUDGE_MODEL    optional; FP-auditor model (falls back to AISC_LLM_MODEL)
+    AISC_JUDGE_ENDPOINT / AISC_JUDGE_API_KEY  optional overrides for the judge
 
 The default implementation below speaks the OpenAI chat-completions protocol,
 which also covers vLLM, Ollama, LM Studio and Azure OpenAI. For anything else,
@@ -67,7 +69,14 @@ class LLMNotConfigured(RuntimeError):
         )
 
 
-def get_response(messages: list[dict], temperature: float = 0) -> str:
+def get_response(
+    messages: list[dict],
+    temperature: float = 0,
+    *,
+    model: str | None = None,
+    endpoint: str | None = None,
+    api_key: str | None = None,
+) -> str:
     """Send a chat request, return the assistant's reply as text.
 
     THE CONTRACT — the rest of the codebase relies on exactly this:
@@ -76,11 +85,14 @@ def get_response(messages: list[dict], temperature: float = 0) -> str:
         returns      the reply as a plain string (never None; "" if empty)
         raises       LLMNotConfigured when credentials are absent
 
+    Optional model / endpoint / api_key kwargs override AISC_LLM_* for a
+    single call (used by the regression FP judge via AISC_JUDGE_*).
+
     Swap in another provider by rewriting this body; nothing else changes.
     """
-    endpoint = os.environ.get("AISC_LLM_ENDPOINT", "")
-    api_key = os.environ.get("AISC_LLM_API_KEY", "")
-    model = os.environ.get("AISC_LLM_MODEL", "gpt-4o")
+    endpoint = endpoint if endpoint is not None else os.environ.get("AISC_LLM_ENDPOINT", "")
+    api_key = api_key if api_key is not None else os.environ.get("AISC_LLM_API_KEY", "")
+    model = model if model is not None else os.environ.get("AISC_LLM_MODEL", "gpt-4o")
     if not api_key:
         raise LLMNotConfigured()
 
@@ -89,7 +101,7 @@ def get_response(messages: list[dict], temperature: float = 0) -> str:
 
     @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
     def _call() -> str:
-        if "azure" in endpoint:
+        if "azure" in (endpoint or ""):
             # Azure speaks the same protocol but on a different URL layout, so
             # it needs its own client. The api-version is a protocol constant,
             # not something worth configuring.
@@ -109,6 +121,24 @@ def get_response(messages: list[dict], temperature: float = 0) -> str:
         return msg.content or getattr(msg, "reasoning_content", None) or ""
 
     return _call()
+
+
+def get_judge_response(messages: list[dict], temperature: float = 0) -> str:
+    """Chat call for the regression FP auditor.
+
+    Uses AISC_JUDGE_MODEL (and optional AISC_JUDGE_ENDPOINT / AISC_JUDGE_API_KEY)
+    when set; otherwise falls back to the main AISC_LLM_* settings.
+    """
+    judge_model = os.environ.get("AISC_JUDGE_MODEL", "").strip() or None
+    judge_endpoint = os.environ.get("AISC_JUDGE_ENDPOINT", "").strip()
+    judge_key = os.environ.get("AISC_JUDGE_API_KEY", "").strip()
+    return get_response(
+        messages,
+        temperature=temperature,
+        model=judge_model,
+        endpoint=judge_endpoint if judge_endpoint else None,
+        api_key=judge_key if judge_key else None,
+    )
 
 
 if __name__ == "__main__":

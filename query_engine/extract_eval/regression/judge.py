@@ -109,7 +109,7 @@ def _parse(raw: str) -> dict | None:
 
 
 async def _judge_one(doc_text: str, class_name: str, gold_labels: list[str], entity: dict) -> dict:
-    from extract_pipeline.llm import _call_llm
+    from utils.openai_api import get_judge_response
 
     payload = {
         "ontology_class": class_name,
@@ -122,7 +122,7 @@ async def _judge_one(doc_text: str, class_name: str, gold_labels: list[str], ent
         {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
     ]
     try:
-        raw = await asyncio.to_thread(_call_llm, messages, 0.0)
+        raw = await asyncio.to_thread(get_judge_response, messages, 0.0)
     except Exception as exc:  # noqa: BLE001
         return {"verdict": "false_positive", "reason": f"judge call failed: {exc}"}
     parsed = _parse(raw) or {}

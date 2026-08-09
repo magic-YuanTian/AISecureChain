@@ -35,11 +35,17 @@ query_engine/extract_eval/regression/report_*.json
 query_engine/extract_eval/regression/proposed_gold.yaml
 query_engine/extract_eval/regression/*.xlsx
 query_engine/extract_eval/regression/*.csv
+# Keep the Track A link list (source URLs for the active suite).
+!query_engine/extract_eval/regression/track_a_links.csv
 query_engine/extract_eval/regression/csv/
 query_engine/extract_eval/report*.json
 query_engine/extract_eval/bench.json
 query_engine/extract_eval/blog_results.json
 query_engine/extract_eval/*_results.json
+query_engine/track_a_report.json
+
+# ── Local Python venv ────────────────────────────────────────────────────
+query_engine/myenv/
 
 # ── Local editor / agent settings ────────────────────────────────────────
 # Machine-specific and may embed private ids from past commands.

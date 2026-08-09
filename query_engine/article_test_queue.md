@@ -1,6 +1,7 @@
-# Article test queue — vulnerability briefs
+# Article test queue — extraction dumps
 
-Short explanations of each article/URL we extract for Track A testing (pipeline quality, not CWE validate).
+Brief article note + what the extraction pipeline returned (`source_url.preview_json`, then merged).
+One table per class; every extracted object and the attributes that were set (empty attrs omitted from columns).
 
 ---
 
@@ -8,35 +9,54 @@ Short explanations of each article/URL we extract for Track A testing (pipeline 
 
 **URL:** https://www.securityweek.com/vulnerability-in-claude-extension-for-chrome-exposes-ai-agent-to-takeover/
 
-**What it is:** A design/implementation flaw in **Anthropic’s Claude extension for Chrome** (reported by **LayerX**, May 2026). The extension trusts the *origin* of a command (e.g. `claude.ai`) instead of the *execution context*, and is lax about which scripts can talk to it. A **zero-permission** malicious Chrome extension can inject prompts and drive Claude’s agent actions (read Gmail/GitHub/Drive, send mail, share docs). User-confirmation guards can be bypassed (forged confirmations, DOM tricks). Anthropic’s partial fix still left a “privileged mode” bypass.
+LayerX reports a flaw in Anthropic’s Claude extension for Chrome (ClaudeBleed): the extension trusts command origin (`claude.ai`) instead of execution context, so a zero-permission malicious extension can inject prompts and drive the AI agent (Gmail/GitHub/Drive exfil, etc.). Often no CVE → pipeline may mint `AISC-…`.
 
-**How the attack works (plain English):**
+**Pipeline:** 7 entities · previewed 2026-08-07T21:23:35 · merged 2026-08-07T21:29:16
 
-Chrome extensions and pages talk to each other with messages. Claude’s extension is supposed to only obey **trusted** callers. LayerX’s point:
+### Vulnerability (1)
 
-1. **Wrong trust check** — Claude-in-Chrome asks “did this come from the `claude.ai` *origin*?” not “is this really Claude’s own code / a safe *context*?” Anything running *as if* it were on `claude.ai` looks trusted.
-2. **Malicious extension rides that** — Attacker ships a normal-looking Chrome extension with a **content script** set to run in the page’s **main world** (same JS environment as the site). On a `claude.ai` tab, that script is treated as part of the page origin.
-3. **Prompt injection into the agent** — The script messages Claude’s extension. Claude accepts and **forwards arbitrary prompts**, so the attacker steers the AI agent (open mail, pull files, act on the user’s behalf) without the user typing those prompts.
+| vuln_id | title | _minted_id |
+|---|---|---|
+| AISC-2026-39B822 | ClaudeBleed | true |
 
-So it’s not “hack Claude’s model weights” — it’s **abuse the browser extension’s trust boundary** so a low-privilege extension inherits Claude’s high-privilege agent powers. “Remote prompt injection” here means injecting instructions *into Claude via that message channel*, not via an email RAG path like EchoLeak.
+### Attack (1)
 
-**Official id:** None required on the page (often **narrative-only** → pipeline may mint `AISC-…`). Sometimes discussed without a CVE.
+| name | description |
+|---|---|
+| Indirect Prompt Injection | An attacker can perform remote prompt injection and control the AI agent’s actions. |
 
-**Why it matters for us:** Classic **AI-agent / browser-extension** story: Attack → Vulnerability → Impact (takeover, data theft), with clear Software (Claude for Chrome) and Vendor (Anthropic). Richest gold fixture in the eval suite (`securityweek-vulnerability-in-claude`) with CWEs like origin validation / access control / LLM prompt neutralization — but Track A ignores CWE mapping.
+### Impact (3)
 
-**Extract should center on:** Claude Chrome extension, Anthropic, prompt injection / extension abuse / origin-vs-context trust failure, agent takeover / data exfil. Side “related” links on the page are noise.
+| name | description |
+|---|---|
+| Information Disclosure | Exfiltrate data from Gmail, GitHub, or Google Drive. |
+| Data Exfiltration | Exfiltrate data from Gmail, GitHub, or Google Drive. |
+| Instruction Override | Control the AI agent’s actions. |
 
-### Run notes (2026-08-06) — preview only
+### Vendor (1)
 
-| Class | Score | What we got |
-|--------|--------|-------------|
-| Vulnerability | **good** | `AISC-2026-39B822`, title ClaudeBleed, `_minted_id=yes`; description empty (small miss) |
-| Vendor | **good** | Anthropic only |
-| Software | **good** | Claude extension for Chrome, AI / Agent / affected — single product |
-| Attack | **good** | Indirect Prompt Injection (wording a bit EchoLeak-ish, mechanism OK) |
-| Impact | **good–messy** | Information Disclosure, Data Exfiltration; Instruction Override vague |
+| name |
+|---|
+| Anthropic |
 
-**Worst stage:** none major — stayed on main story (no Related-link bleed). Cleaner than EchoLeak.
+### Software (1)
+
+| name | is_ai | software_type | role |
+|---|---|---|---|
+| Claude extension for Chrome | true | Agent | affected |
+
+**Notes / investigate**
+
+- No `description` on Vulnerability — page has it (deck: “Lax extension permissions and improper trust implementation…”; also body).
+- No `date_published` — page has **May 8, 2026**. May be markdown stripping/cleaning, or LLM drop — check.
+- Attack + Impact look good.
+- Rest (Vendor Anthropic, Software Claude extension for Chrome / Agent / affected, minted `AISC-…` ClaudeBleed) makes sense.
+
+**Thoughts**
+
+- Core story is clean — not a “wrong extract”; the miss is attribute fill (`description`, `date_published`), and both strings are already in the crawled markdown, so lean LLM drop over strip/clean.
+- Info Disclosure + Data Exfiltration are the same Gmail/GitHub/Drive harm twice — fine to keep one.
+- Best single-product extract in the queue so far.
 
 ---
 
@@ -44,192 +64,199 @@ So it’s not “hack Claude’s model weights” — it’s **abuse the browser
 
 **URL:** https://thehackernews.com/2025/06/zero-click-ai-vulnerability-exposes.html
 
-**What it is:** **CVE-2025-32711** (CVSS ~9.3), dubbed **EchoLeak**, found by **Aim Security**. An attacker sends a normal-looking email that embeds a malicious prompt. When the employee later asks **Microsoft 365 Copilot** something business-related, Copilot’s **RAG** path mixes that **untrusted** email with **privileged** internal context (**LLM scope violation** / indirect prompt injection). Sensitive data from the Copilot context can leak out (e.g. via Teams/SharePoint-style URLs) **without the user clicking** the malicious mail. Microsoft patched server-side; no evidence of in-the-wild abuse.
+**CVE-2025-32711** (CVSS 9.3), Aim Security: malicious prompt in email → M365 Copilot RAG mixes untrusted content with privileged context (indirect prompt injection / LLM scope violation) → data exfil without user click. Same THN page also digresses into MCP tool poisoning / GitHub MCP / DNS rebinding.
 
-**Official id:** `CVE-2025-32711` (ID-backed, not narrative-only).
+**Pipeline:** 14 entities · previewed 2026-08-07T21:23:30 · merged 2026-08-07T21:29:14
 
-**Why it matters for us:** Clean **ID + AI product** story: Microsoft / M365 Copilot / indirect prompt injection / data exfiltration. Good contrast to ClaudeBleed (which may lack a CVE).
+### Vulnerability (1)
 
-**Hard edge case:** The same THN article also wanders into **MCP tool poisoning**, GitHub MCP “toxic agent flow,” and **MCP DNS rebinding**. Those are **separate** research threads. A good extract keeps **EchoLeak / CVE-2025-32711** as the main Vulnerability; a messy one promotes every digression to equal vulns.
+| vuln_id | title | description | cvss_severity | cvss_base_score |
+|---|---|---|---|---|
+| CVE-2025-32711 | EchoLeak | AI command injection in M365 Copilot allows an unauthorized attacker to disclose information over a network. | CRITICAL | 9.3 |
 
-**Extract should center on:** CVE-2025-32711, Microsoft, M365 Copilot (`is_ai=true`), indirect prompt injection / scope violation, data exfiltration. Outlook/Teams/SharePoint as context is optional.
+### Attack (4)
 
-### Run notes (2026-08-06) — 14 entities
+| name | description |
+|---|---|
+| Indirect Prompt Injection | The attacker embeds a malicious prompt payload inside markdown-formatted content, like an email, which is then parsed by the AI system’s retrieval-augmented generation (RAG) engine. |
+| Command Injection | — |
+| Phishing | — |
+| Social Engineering | — |
 
-| Class | Score | What we got |
-|--------|--------|-------------|
-| Vulnerability | **good** | `CVE-2025-32711` EchoLeak, CRITICAL 9.3, solid description |
-| Vendor | **messy** | Microsoft ✓; GitHub only from MCP digression |
-| Software | **messy** | M365 Copilot + duplicate “Copilot”; MCP / GitHub MCP marked `affected` |
-| Attack | **messy** | Indirect Prompt Injection ✓; Command Injection / Phishing / Social Engineering noisy |
-| Impact | **messy** | Info Disclosure + Data Exfiltration (same idea twice) |
+### Impact (2)
 
-**Worst stage:** LLM extract (over-includes digressions; weak Attack names; product name split). Crawl/id look fine.
+| name | description |
+|---|---|
+| Information Disclosure | The attacker can automatically exfiltrate sensitive and proprietary information from M365 Copilot context. |
+| Data Exfiltration | The attacker relies on Copilot's default behavior to combine and process content from Outlook and SharePoint without isolating trust boundaries – turning helpful automation into a silent leak vector. |
 
-#### Is MCP really a “side track” if the article mentioned it?
+### Vendor (2)
 
-Yes — **mentioned ≠ part of this vulnerability’s story.**
+| name |
+|---|
+| Microsoft |
+| GitHub |
 
-- The page is a **news bundle**: headline = EchoLeak; later sections = other MCP research for context/trend.
-- Ontology `role` is the lever: `affected` / `tool` for *this* finding vs `mentioned` for background.
-- Extracting MCP as Software with `role=mentioned` (or a separate narrative vuln if it has its own id) can be OK.
-- Marking MCP / GitHub MCP as **`affected` by CVE-2025-32711** is wrong — that CVE is Copilot’s flaw, not MCP’s.
-- So “side track” means **secondary to the primary CVE**, not “the article never said it.”
+### Software (5)
 
-#### Where should the Copilot duplicate be fixed?
+| name | is_ai | software_type | role |
+|---|---|---|---|
+| Microsoft 365 Copilot | true | Application | affected |
+| Copilot | true | Application | affected |
+| Model Context Protocol | true | Library | affected |
+| GitHub MCP integration | true | AI Component | affected |
+| MCP server | true | Application | affected |
 
-We got two Software rows: **Microsoft 365 Copilot** and **Copilot** (same product, different strings).
+**Notes / investigate**
 
-| Stage | What happens today | Ideal |
-|--------|-------------------|--------|
-| **Extract (LLM)** | Often emits both names from the prose | Prefer one canonical name (`Microsoft 365 Copilot`) and aliases in text, not two entities |
-| **Merge** | Identity is `Software::<vendor_norm>::<name_norm>` — **exact normalized name**. `copilot` ≠ `microsoft 365 copilot`, so they **do not merge** | Would need alias lists / same-as / smarter product matching (not implemented as name-alias merge today) |
-| **Persist / consolidate** | Inserts both rows if both survived | No magic rename; DB keeps what merge handed it |
+- Unsure about Attack rows **Command Injection**, **Phishing**, **Social Engineering** — feel like noise next to Indirect Prompt Injection.
+- Impact looks good.
+- Vendor **GitHub** is because the article drifts into GitHub MCP / related MCP stories — not because GitHub owns EchoLeak.
+- Softwares for MCP / GitHub MCP marked `affected` same problem (digression bleed); also **Copilot** duplicate of M365 Copilot.
+- This page is **not a great test** — THN bundle, all over the place — but overall extract not bad (core CVE + severity + description landed).
 
-**Bottom line:** the dupe is mainly an **extract naming** problem; merge only collapses **identical** (vendor+name) keys, not “Copilot” ≈ “Microsoft 365 Copilot.” Fixing it properly = better extract prompt / post-filters / alias table — not “Consolidate will fix it.”
+**Thoughts**
 
-### Queue status update
-
-EchoLeak: **extracted (messy)** — core CVE good; digression + Copilot split.
+- For “did we get EchoLeak?” → yes (CVE, severity, description, Indirect PI, Microsoft / M365 Copilot).
+- For “did we stay on the headline vuln?” → no; MCP/GitHub as `affected` is digression bleed — role should be `mentioned` at best.
+- Weak gold fixture for Track A; use a cleaner Copilot/CVE-only page when you want a fair score.
 
 ---
 
-## 3. MCPoison — Cursor MCP trust bypass → silent RCE
+## 3. MCPoison — Cursor MCP trust bypass → silent RCE (Dark Reading)
 
 **URL:** https://www.darkreading.com/vulnerabilities-threats/rce-flaw-ai-coding-tool-supply-chain-risk
 
-**What it is:** **CVE-2025-54136** (“MCPoison”), found by **Check Point Research**, in **Cursor** (AI coding IDE). Cursor’s MCP setup used a **one-time approval**: the first time you see an MCP entry, you approve it; later changes to that **same named** entry were trusted with **no new prompt**. An attacker with write access to a **shared repo** can:
+**CVE-2025-54136** (MCPoison), Check Point: Cursor one-time MCP approval binds trust to entry **name**, not command — shared-repo config swap → silent persistent RCE. Fixed in Cursor **1.3**. Article also notes **CVE-2025-54135** (CurXecute, Aim Labs).
 
-1. Commit a **harmless** MCP config (e.g. `echo hello`) under a friendly name.  
-2. You approve it once.  
-3. Later they **swap the command** for something malicious (still the same name).  
-4. Next time you open the project / sync, Cursor **runs that command on your machine** — silently, persistently.
+**Pipeline:** 16 entities · previewed 2026-08-07T21:22:17 · merged 2026-08-07T21:29:10
 
-Fixed in Cursor **1.3** by requiring re-approval when the config **content** changes, not only when a name is new. Dark Reading frames this as **AI-assisted supply-chain risk** (poison the shared project config → hit every teammate’s laptop).
+### Vulnerability (2)
 
-**Your MCP intuition — close, but MCPoison is even more basic:**
-
-- You’re right that Cursor **trusts** something after you allow it.  
-- The bug was: trust stuck to the **entry name**, not the **exact command/args**.  
-- This is **not** mainly “MCP tool output gets injected into the model prompt” (that’s **tool poisoning** / prompt injection).  
-- MCPoison is **process launch**: Cursor starts the MCP server command you (thought you) approved. After the swap, that command is attacker-controlled **code on your OS** — the LLM doesn’t have to be tricked.
-
-**How someone else changes “your” laptop config:**
-
-The MCP entry usually lives in the **shared git repo** (e.g. `.cursor/mcp.json`), not only in a private local setting.
-
-1. Attacker commits a harmless MCP command → you pull, open Cursor, **approve once**.  
-2. They push a later commit that **changes that same named command**.  
-3. You `git pull` / sync → the file **on your desktop** updates.  
-4. Cursor still trusts the **name** → runs the new command locally.
-
-They don’t remote-hack your machine first — they poison a file you **voluntarily sync**, and Cursor keeps auto-running it. That’s the supply-chain angle.
-
-**Local MCP + what the command can do:**
-
-- Typical PoC = **local** MCP: Cursor on your desktop runs a **start command** for a process on your desktop.  
-- That command can be anything your user can run: reverse shell, delete files, steal `~/.aws` / git tokens, etc.  
-- You did **not** need to “install” separate malware from an app store — you approved a **config line** that says how to start the server; after the git edit, that line became the payload.  
-- Reverse shell = one demo (dial out, give attacker a remote terminal). Not the only impact.
-
-**Official id (Dark Reading lead):** `CVE-2025-54136` (MCPoison). The same Cursor/MCP story family often also cites **CurXecute** `CVE-2025-54135` — different bug; see below.
-
-### MCPoison vs CurXecute (don’t mix them)
-
-| | **MCPoison** `CVE-2025-54136` | **CurXecute** `CVE-2025-54135` |
+| vuln_id | title | description |
 |---|---|---|
-| Core idea | Trust stuck on MCP **entry name**; git swap of **command** after one approval | **Prompt injection** → agent writes/changes `mcp.json`; Cursor **runs it before you accept/reject** |
-| Needs the LLM tricked? | **No** — pure config/process trust | **Yes** — untrusted text (e.g. Slack/MCP data) steers the agent |
-| Your earlier intuition | “Approve once, Cursor forever trusts that slot” ≈ **MCPoison** (name, not content) | “Stuff from MCP/untrusted context gets into Cursor and leads to bad MCP/commands” ≈ **CurXecute** |
-| Classic impact | Silent local RCE / reverse shell on project open | RCE via agent-written MCP config |
+| CVE-2025-54136 | MCPoison | A flaw in the trust model of Cursor related to how it has configured its Model Context Protocol (MCP), allowing for silent and persistent remote code execution. |
+| CVE-2025-54135 | CurXecute | — |
 
-So: you weren’t wrong about the **prompt / untrusted-context → dangerous MCP** path — that’s **CurXecute**. **MCPoison** is the colder supply-chain variant (no model required). Dark Reading’s main headline is MCPoison; extracts often surface both — **prefer two Vulnerability rows** if both CVEs appear.
+### Attack (4)
 
-**Extract should center on / expect:**
+| name | description |
+|---|---|
+| Code Injection | An attacker can repeatedly inject malicious commands without user awareness. |
+| Prompt Injection | — |
+| Data Poisoning | — |
+| Supply Chain Attack | — |
 
-| Class | Good extract |
-|--------|----------------|
-| Vulnerability | Lead: `CVE-2025-54136` MCPoison. If CurXecute present: **second** vuln `CVE-2025-54135` — don’t mash into one id-less blob |
-| Vendor | Cursor / Anysphere; Check Point (and/or Aim if CurXecute named) as researcher OK |
-| Software | **Cursor** affected; MCP = protocol/feature |
-| Attack | MCPoison: config trust bypass / repo command swap. CurXecute: indirect prompt injection → MCP file write |
-| Impact | RCE, persistence, credential/data theft, supply-chain hit on developer machines |
-| Version | Fixed in Cursor 1.3 if stated |
+### Impact (7)
 
-**Watch for (messy):**
-- Treating “MCP” as the vulnerable product instead of Cursor  
-- Collapsing MCPoison + CurXecute into one Vulnerability  
-- Calling MCPoison “prompt injection” (that label fits **CurXecute** better)  
-- Phishing as the main Attack for MCPoison  
+| name | description |
+|---|---|
+| Remote Code Execution | Allows for silent and persistent remote code execution. |
+| Privilege Escalation | Attackers can use the flaw to escalate privileges within the user context. |
+| Persistence | The malicious MCP is re-executed on every project launch or repository sync. |
+| Data Exfiltration | — |
+| Model Manipulation | — |
+| Credential Theft | — |
+| Information Disclosure | — |
 
-### Run notes (2026-08-06) — 16 entities, preview only
+### Software (2)
 
-| Class | Score | What we got |
-|--------|--------|-------------|
-| Vulnerability | **good** | Both CVEs as separate rows: `CVE-2025-54136` MCPoison (decent description) + `CVE-2025-54135` CurXecute (title only — thin) |
-| Software | **messy** | Cursor ✓ `affected`; **MCP** also `affected` / AI Component — protocol treated like a product |
-| Version | **messy** | `1.3` alone — that’s the **fix**, not “affected &lt; 1.3”; easy to misread |
-| Attack | **messy** | Supply Chain Attack ✓ for MCPoison; Prompt Injection fits CurXecute; Code Injection / Data Poisoning vague or wrong label |
-| Impact | **messy** | RCE + Persistence + Credential Theft on-target; Privilege Escalation / Model Manipulation / Info Disclosure noisy or overlapping (7 impacts is a lot) |
-| Vendor | **miss** | No Cursor/Anysphere or Check Point row |
+| name | is_ai | software_type | role |
+|---|---|---|---|
+| Cursor | true | Application | affected |
+| MCP | true | AI Component | affected |
 
-**Worst stage:** extract labeling — right CVE split, but MCP-as-affected, fix version as Version entity, impact sprawl.
+### Version (1)
 
-**Overall:** better than EchoLeak on vuln ids (kept MCPoison ≠ CurXecute); messier than ClaudeBleed on Software/Impact discipline.
+| version_string |
+|---|
+| 1.3 |
+
+**Notes / investigate**
+
+- CurXecute (`CVE-2025-54135`) is a **side note**, but the page has enough text for a description (“This version also fixes a prompt-injection flaw in Cursor’s MCP discovered by Aim Labs… dubbed CurXecute”) — extract left description empty.
+- Attack **Code Injection** is OK-ish for MCPoison (malicious command swapped into MCP config); **Prompt Injection** would fit **CurXecute** better (and the side note literally says prompt-injection).
+- No idea why **Data Poisoning** is there — doesn’t match either CVE.
+- **Supply Chain Attack** makes sense — article frames shared-repo / AI supply-chain risk.
+- Impacts are **fair** (RCE, Persistence, etc.) but several lack descriptions (Data Exfiltration, Model Manipulation, Credential Theft, Information Disclosure empty).
+
+**Thoughts**
+
+- Win is keeping MCPoison ≠ CurXecute as two Vulnerability rows; empty CurXecute description is the clear attr miss.
+- Attack set is half-right (Code Injection / Supply Chain) and half-noise (Data Poisoning; Prompt Injection untied to which CVE).
+- Prefer fewer Impacts with one-line descriptions; also MCP as `affected` product and Version=`1.3` (fix, not affected-before) are the usual hygiene nits.
 
 ---
 
 ## 4. Anthropic `mcp-server-git` — three CVEs chained with Filesystem MCP → RCE
 
-**URL:** https://www.theregister.com/security/2026/01/20/anthropic-quietly-fixed-flaws-in-its-git-mcp-server/4676059  
-(alt slug: https://www.theregister.com/2026/01/20/anthropic_prompt_injection_flaws/)
+**URL:** https://www.theregister.com/security/2026/01/20/anthropic-quietly-fixed-flaws-in-its-git-mcp-server/4676059
 
-**What it is (plain English):**  
-Anthropic’s official **Git MCP server** (`mcp-server-git`) lets AI tools (Copilot, Claude, Cursor, …) talk to Git/GitHub in natural language. **Cyata** found **three bugs** that look limited alone but **chain** with the **Filesystem MCP server** into **RCE**, kicked off by **indirect prompt injection** (malicious README / webpage / GitHub issue the IDE reads).
+Cyata found **CVE-2025-68145** / **68143** / **68144** in Anthropic’s Git MCP server; chained with Filesystem MCP + git smudge/clean filters → RCE via indirect prompt injection. Fixed prior to **2025.12.18**.
 
-| CVE | Flaw | Plain meaning |
-|-----|------|----------------|
-| **CVE-2025-68145** | Path validation bypass (`--repository`) | Meant to stay inside one repo path; later calls could reach **any** repo on the machine |
-| **CVE-2025-68143** | Unrestricted `git_init` | Could turn **any directory** into a git repo. Fix: Anthropic **removed** `git_init` |
-| **CVE-2025-68144** | Arg injection in `git_diff` / checkout | Unsanitized args → e.g. `--output=…` to **overwrite/delete files** |
+**Pipeline:** 17 entities · previewed 2026-08-07T21:23:23 · merged 2026-08-07T21:29:12
 
-**Attack chain (“toxic combination”):**  
-1. Indirect prompt injection steers the agent.  
-2. Abuse `git_init` / path bypass to get a writable git repo.  
-3. **Filesystem MCP** writes a bash payload and poisons `.git/config` + `.gitattributes` with Git **clean/smudge filters** (`clean/smudge = sh exploit.sh`).  
-4. Those filters run on git ops → **shell executes → RCE**.
+### Vulnerability (3)
 
-Fixed in `mcp-server-git` **≥ 2025.12.18** (reported Jun, fixed Dec; Register Jan 2026). No known in-the-wild use. Cyata’s point: don’t review each MCP in isolation — **Git + Filesystem** expands the blast radius.
+| vuln_id | title |
+|---|---|
+| CVE-2025-68145 | MCP server repository path bypass |
+| CVE-2025-68143 | Arbitrary filesystem path creation via git_init |
+| CVE-2025-68144 | Argument injection in git_diff and git_checkout |
 
-**vs Cursor MCPoison / CurXecute:** those are mostly **Cursor’s MCP config trust**. This is bugs **inside Anthropic’s Git MCP server**, plus chaining another MCP — agentic **composition** risk.
+### Attack (2)
 
-**Extract should center on / expect:**
+| name | description |
+|---|---|
+| Prompt Injection | Direct prompt injection happens when someone directly submits malicious input |
+| Indirect Prompt Injection | indirect injection happens when content contains hidden commands that AI then follows as if the user had entered them |
 
-| Class | Good extract |
-|--------|----------------|
-| Vulnerability | **Three** rows: `CVE-2025-68145`, `CVE-2025-68143`, `CVE-2025-68144` |
-| Vendor | **Anthropic**; **Cyata** as researcher OK |
-| Software | **mcp-server-git** / Git MCP server, `role=affected`. Clients (Claude/Cursor/Copilot) = `mentioned` unless story says they’re the buggy component. **Filesystem MCP** = chained tool (`tool` / mentioned), not the primary patched product |
-| Attack | Indirect prompt injection; MCP tool chaining; git smudge/clean filter abuse |
-| Impact | RCE; arbitrary file overwrite/delete; repo path escape |
-| Version | Affected **before 2025.12.18** — don’t only emit the fix version with no “affected” framing |
+### Impact (4)
 
-**Watch for (messy):** one vague “MCP RCE”; generic “MCP” as affected product; Register sidebar stories as equal vulns; collapsing into Cursor MCPoison/CurXecute.
+| name | description |
+|---|---|
+| Remote Code Execution | — |
+| File Overwrite | — |
+| Information Disclosure | Access any repository on the system |
+| File Deletion | — |
 
-### Run notes (2026-08-06) — 23 entities, preview only
+### Vendor (1)
 
-| Class | Score | What we got |
-|--------|--------|-------------|
-| Vulnerability | **good** | All three CVEs as separate rows with sensible titles; descriptions empty (small miss) |
-| Vendor | **good–messy** | Anthropic ✓; Cyata researcher missing |
-| Software | **messy** | Right family (Git MCP / mcp-server-git) but **duplicated 3–4 ways** + generic MCP + Claude Code + Git all `affected` |
-| Version | **good** | `prior to 2025.12.18` — correct affected framing (better than Cursor “1.3” fix-only) |
-| Attack | **messy** | Indirect Prompt Injection ✓ (and the article’s direct vs indirect gloss); generic Prompt Injection + Code Injection overlap; Argument Injection fits 68144 |
-| Impact | **messy** | RCE / file overwrite / deletion / repo access on-target; Instruction Override is attack-shaped; Arbitrary File Overwrite ≈ File Overwrite dupe |
+| name |
+|---|
+| Anthropic |
 
-**Worst stage:** Software identity — one product split into Git MCP server / mcp-server-git / MCP server / MCP library / Claude Code / Git.
+### Software (6)
 
-**Overall:** **best CVE hygiene so far** (3 clean ids). Software sprawl like EchoLeak/MCP-as-product pattern.
+| name | is_ai | software_type | role |
+|---|---|---|---|
+| mcp-server-git | true | AI Component | affected |
+| Model Context Protocol (MCP) | true | Library | affected |
+| Claude Code | true | Agent | affected |
+| MCP server | true | AI Component | affected |
+| Git | false | Application | affected |
+| Git MCP server | true | AI Component | affected |
+
+### Version (1)
+
+| version_string |
+|---|
+| prior to 2025.12.18 |
+
+**Notes / investigate**
+
+- Attack should be **Indirect Prompt Injection** only for this story (IDE reads malicious README / webpage / GitHub issue). Generic **Prompt Injection** looks like it copied the article’s direct-vs-indirect glossary, not a second attack path.
+- Enough info on the page for Vulnerability **descriptions** on all three CVEs — extract left them empty:
+  - **68145** — `--repository` path bypass; later `repo_path` args not validated → any repo on the system
+  - **68143** — unrestricted `git_init` on arbitrary paths; Anthropic removed the tool
+  - **68144** — unsanitized args to `git_diff` / `git_checkout` → `--output=…` overwrite / delete files
+- Impacts look good (RCE, File Overwrite, File Deletion, Information Disclosure) but most are **missing descriptions** (only Info Disclosure has one).
+
+**Thoughts**
+
+- Best CVE hygiene so far — three clean ids + Version `prior to 2025.12.18`; titles good, descriptions the miss (Register paragraphs are almost paste-ready).
+- Bare Prompt Injection is glossary bleed; keep Indirect only for the Cyata chain.
+- Software sprawl (mcp-server-git / Git MCP server / MCP server + Claude Code / Git as `affected`) is the other weak spot if we widen the score later.
 
 ---
 
@@ -237,58 +264,415 @@ Fixed in `mcp-server-git` **≥ 2025.12.18** (reported Jun, fixed Dec; Register 
 
 **URL:** https://www.microsoft.com/en-us/security/blog/2026/05/07/prompts-become-shells-rce-vulnerabilities-ai-agent-frameworks/
 
-**What it is (plain English):**  
-Microsoft Defender researchers show how **AI agent frameworks** turn **prompt injection** into **host RCE**. The model isn’t broken — it maps language → tool calls as designed. The bug is **framework/tools trusting those parameters**. Case study: **Microsoft Semantic Kernel**. Two fixed CVEs:
+Microsoft Security Blog: prompt injection → host RCE via AI agent frameworks. Case study **Semantic Kernel** with **CVE-2026-26030** (Python In-Memory Vector Store / `eval`) and **CVE-2026-25592** (.NET SessionsPythonPlugin).
 
-| CVE | Where | What goes wrong |
-|-----|--------|------------------|
-| **CVE-2026-26030** | Python SK — **In-Memory Vector Store** search filter | Default filter builds a `lambda` via string formatting → **`eval()`**. Model-controlled args → injection. AST blocklist bypassable. Demo: one prompt → `calc.exe`. Needs prompt-injection vector + Search Plugin on default In-Memory store. **Fix: `semantic-kernel` ≥ 1.39.4** |
-| **CVE-2026-25592** | **.NET** SK — **SessionsPythonPlugin** | Sandbox (Azure Container Apps) escape: `DownloadFileAsync` wrongly exposed as `[KernelFunction]` so the model picks **any host path** for write. Chain: build payload in container → download to Windows **Startup** → RCE on login. Related unsafe upload → host file **read**. **Fix: .NET SDK ≥ 1.71.0** |
+**Pipeline:** 1 entities · previewed 2026-08-07T16:14:44 · merged 2026-08-07T21:28:57
 
-**Big lesson:** not LLM bugs — **agent/tool design**. Same family as MCP stories, but vulnerable product = **Semantic Kernel** (framework), not Cursor config or `mcp-server-git`.
+### Vendor (1)
 
-**Page noise:** LangChain/CrewAI (series teaser), CTF, hunting KQL, related blogs (ClickFix, ChainDrop) — don’t promote to equal main vulns.
-
-**Extract should center on / expect:**
-
-| Class | Good extract |
-|--------|----------------|
-| Vulnerability | **Two** rows: `CVE-2026-26030` + `CVE-2026-25592` with distinct mechanisms |
-| Vendor | **Microsoft** |
-| Software | **Semantic Kernel** / `semantic-kernel`, `is_ai=true`, `role=affected`. Optional components: In-Memory Vector Store, SessionsPythonPlugin. LangChain/CrewAI = `mentioned` only |
-| Attack | Prompt injection / tool-argument injection; optional AST bypass, sandbox escape |
-| Impact | RCE; arbitrary file write; file read / credential exfil; persistence (Startup) |
-| Version | Affected Python **&lt; 1.39.4**, .NET **&lt; 1.71.0** — not only the fixed version alone |
-
-**Watch for (messy):** one mushy SK RCE; “AI agents”/Defender/calc.exe as Software; LangChain as affected; related-post supply-chain stories; Version = only `1.39.4` like Cursor `1.3` footgun.
+| name |
+|---|
+| Microsoft |
 
 ---
 
-## Quick compare
+## 6. Bleeding Llama — Ollama heap OOB → secret theft
 
-| | ClaudeBleed | EchoLeak | MCPoison / CurXecute | Git MCP (Cyata) | Semantic Kernel |
-|---|-------------|----------|----------------------|-----------------|-----------------|
-| Product | Claude Chrome extension | M365 Copilot | Cursor IDE | Anthropic `mcp-server-git` | Microsoft Semantic Kernel |
-| Vendor | Anthropic | Microsoft | Cursor / Anysphere | Anthropic | Microsoft |
-| Style | Extension origin trust | Email + RAG scope violation | MCP name trust / agent writes mcp.json | Git MCP × Filesystem + PI | Framework tool sinks: `eval` filter + host file write |
-| Id | Often `AISC-…` | `CVE-2025-32711` | `CVE-2025-54136` / `54135` | `CVE-2025-68145` / `68143` / `68144` | `CVE-2026-26030` / `CVE-2026-25592` |
-| Researcher | LayerX | Aim Security | Check Point (+ Aim) | Cyata | MS Defender Research |
+**URL:** https://www.securityweek.com/critical-bug-could-expose-300000-ollama-deployments-to-information-theft/
+
+**CVE-2026-7482** (CVSS 9.3), Cyera: heap out-of-bounds read in Ollama’s GGUF model loader; exfil via model push. ~300k internet-exposed instances. Fixed in Ollama **0.17.1**.
+
+**Pipeline:** 5 entities · previewed 2026-08-07T16:19:33 · merged 2026-08-07T21:29:00
+
+### Vulnerability (1)
+
+| vuln_id | title | description |
+|---|---|---|
+| CVE-2026-7482 | Bleeding Llama | A heap out-of-bounds read issue in the GGUF model loader that allows an attacker to access sensitive information stored on the heap. |
+
+### Attack (1)
+
+| name | description |
+|---|---|
+| Model Extraction | The attacker leverages Ollama’s built-in model push feature to exfiltrate the resulting file – complete with stolen heap data – to an attacker-controlled server. |
+
+### Impact (1)
+
+| name | description |
+|---|---|
+| Information Disclosure | Exposure of employee interactions, development code, routed tool outputs, and prompts containing PII, PHI, and other sensitive information. |
+
+### Software (1)
+
+| name | is_ai | software_type | role |
+|---|---|---|---|
+| Ollama | true | ML Infrastructure | affected |
+
+### Version (1)
+
+| version_string |
+|---|
+| 0.17.1 |
+
+**Notes / investigate**
+
+- Misses `cvss_base_score` / severity — page clearly has **CVSS 9.3** (in markdown).
+- Is **Model Extraction** the right Attack? Feels sorta OK because exfil uses model push, but unsure.
+- Impact = Information Disclosure — should it also be **Data Exfiltration**? Unclear difference.
+- Rest seems fine (CVE, Bleeding Llama description, Ollama, Version).
+
+**Thoughts**
+
+- CVSS miss is same attr-drop pattern as ClaudeBleed date — `CVSS score of 9.3` is in the crawled text.
+- **Model Extraction** is the wrong standard name: that usually means stealing model weights via queries. Here the bug is heap OOB read; model push is just the **exfil channel**. Prefer something like unauth API / crafted GGUF (or keep a custom name) — the Attack *description* is actually good, the *label* is off.
+- Info Disclosure = secrets become readable; Data Exfiltration = they leave the host (here via push). Both fit; Disclosure alone underplays the push step. Having both would match EchoLeak-style pairing.
 
 ---
 
-## How we use this list
+## 7. Gemini CLI — CVSS 10 RCE / allowlist bypass (The Register)
 
-1. Track A: `python scripts/reset_kb.py -y` → restart Flask (optional if not consolidating).
-2. **Extract only — do not Consolidate/merge.** Preview tables are enough for scoring; skip persist / `build_rdf` / graph so findings aren’t filtered by DB/CWE and URLs stay independent.
-3. Skim **entity tables** per URL → score good / messy / bad; note worst stage.
-4. Append new URLs below as mentors send more articles.
+**URL:** https://www.theregister.com/patches/2026/04/30/google-fixes-cvss-100-vulnerability-in-gemini-cli/5225768
 
-### Queue status
+Google patches Gemini CLI / `run-gemini-cli` GitHub Action: headless mode trusts workspace `.gemini/` env (RCE) and `--yolo` previously bypassed tool allowlists. Often no CVE yet → may mint `AISC-…`. Fixes in **0.39.1** / **0.40.0-preview.3**.
 
-| # | Name | Status |
-|---|------|--------|
-| 1 | ClaudeBleed | extracted (**clean**) — preview only |
-| 2 | EchoLeak | extracted (messy) — preview only |
-| 3 | MCPoison (Dark Reading / Cursor MCP) | extracted (**mixed**) — preview only; both CVEs kept separate |
-| 4 | Anthropic Git MCP (`mcp-server-git` / Cyata) | extracted (**mixed–good** on CVEs) — preview only; Software sprawl |
-| 5 | Semantic Kernel (MS prompts→shells) | queued |
+**Pipeline:** 14 entities · previewed 2026-08-07T16:19:59 · merged 2026-08-07T21:29:02
+
+### Vulnerability (3)
+
+| vuln_id | title | description | cvss_severity | cvss_base_score | _minted_id |
+|---|---|---|---|---|---|
+| AISC-2026-C6591D | Gemini CLI RCE vulnerability | — | CRITICAL | 10.0 | true |
+| AISC-2026-A43FFF | Remote code execution via malicious environment variables in the local .gemini/ directory | If used with untrusted directory contents in headless mode, malicious environment variables in the local .gemini/ directory could lead to remote code execution. | — | — | true |
+| AISC-2026-872BB8 | Gemini CLI --yolo mode bypasses tool allowlists | — | CRITICAL | 10.0 | true |
+
+### Attack (2)
+
+| name | description |
+|---|---|
+| Supply Chain Attack | — |
+| Code Injection | Using malicious environment variables to execute arbitrary code. |
+
+### Impact (4)
+
+| name | description |
+|---|---|
+| Remote Code Execution | — |
+| Arbitrary Code Execution | Code execution on the host running the agent |
+| Credential Theft | Access to secrets, credentials, and source code |
+| Information Disclosure | — |
+
+### Vendor (1)
+
+| name |
+|---|
+| Google |
+
+### Software (2)
+
+| name | is_ai | software_type | role |
+|---|---|---|---|
+| Gemini CLI | true | Application | affected |
+| run-gemini-cli GitHub Action | true | Application | affected |
+
+### Version (2)
+
+| version_string |
+|---|
+| 0.39.1 |
+| 0.40.0-preview.3 |
+
+**Notes / investigate**
+
+- Got **3** minted Vulnerability rows — unclear if all three were supposed to exist (no CVE on page yet).
+- Unsure about Attack **Code Injection** / code-execution framing.
+- Unsure **Information Disclosure** belongs as an Impact.
+- Rest seems fine (Google, Gemini CLI + Action, versions, Credential Theft / RCE themes).
+
+**Thoughts**
+
+- Prefer **1–2** vulns, not 3: (A) headless workspace trust / malicious `.gemini/` env → RCE is the real finding (row `A43FFF` is the good one; generic “Gemini CLI RCE” is a dupe of that). (B) `--yolo` allowlist bypass is a **related fix in the same release**, not clearly a second CVSS-10 CVE — article never scores it separately; treating it as equal CRITICAL is oversplit.
+- **Code Injection** is OK-ish for “attacker-controlled config/env executed before sandbox” (Meged: *not* prompt injection). **Supply Chain** is the CI delivery framing, empty description. Neither is wrong; Code Injection is closer to the root mechanism.
+- Impacts: keep **RCE** (or Arbitrary Code Execution — not both) + **Credential Theft**. Drop bare **Information Disclosure** — secrets access is already Credential Theft; Disclosure without a distinct leak channel is noise.
+
+---
+
+## 8. Comment and Control — PI via GitHub comments (multi-vendor agents)
+
+**URL:** https://www.securityweek.com/claude-code-gemini-cli-github-copilot-agents-vulnerable-to-prompt-injection-via-comments/
+
+Aonan Guan (+ JHU): prompt injection via untrusted GitHub data (PR titles, comments, HTML comments) against Claude Code Security Review, Gemini CLI Action, and GitHub Copilot Agent. Narrative / multi-product — may mint `AISC-…`.
+
+**Pipeline:** 13 entities · previewed 2026-08-07T16:37:54 · merged 2026-08-07T21:29:04
+
+### Vulnerability (2)
+
+| vuln_id | title | description | _minted_id |
+|---|---|---|---|
+| AISC-2026-2C4DA4 | Comment and Control Prompt Injection | AI agents on GitHub Actions can be hijacked using specially crafted GitHub comments, including PR titles, comments, and issue bodies. | true |
+| AISC-2026-3BD568 | overly broad tool access for a security review agent | — | true |
+
+### Attack (1)
+
+| name | description |
+|---|---|
+| Prompt Injection | A method where specially crafted comments, PR titles, or issue bodies are used to trick an AI agent into executing commands or revealing secrets. |
+
+### Impact (3)
+
+| name | description |
+|---|---|
+| Arbitrary Code Execution | The AI agent is tricked into executing arbitrary commands. |
+| Credential Theft | Extracting credentials and revealing them as a security finding or an entry in the GitHub Actions log. |
+| Information Disclosure | Obtaining a full API key. |
+
+### Vendor (3)
+
+| name |
+|---|
+| Anthropic |
+| Google |
+| GitHub |
+
+### Software (4)
+
+| name | is_ai | software_type | role |
+|---|---|---|---|
+| Claude Code Security Review | true | Agent | affected |
+| Gemini CLI Action | true | Agent | affected |
+| GitHub Copilot Agent | true | Agent | affected |
+| security review agent | true | Agent | affected |
+
+**Notes / investigate**
+
+- Second AISC (`overly broad tool access for a security review agent`) is **unnecessary**.
+- Unsure about Impact **Arbitrary Code Execution**; also should **Credential Theft** and **Information Disclosure** both be there?
+- What the hell is Software **security review agent**?
+- Rest looks fine (lead Comment and Control vuln, Prompt Injection, three vendors, three real agents).
+
+**Thoughts**
+
+- Second AISC is Anthropic **remediation commentary** from the page UPDATE (tool access still too broad after the fix) — not a separate vulnerability. Drop it; keep one minted “Comment and Control” row (or ideally one per product, but not a remediation note).
+- **security review agent** is the same bleed: a generic alias for Claude Code Security Review, invented from that remediation sentence. Not a fourth product — delete it.
+- Impacts: ACE (or RCE) for “agent runs attacker commands” is fair. Credential Theft + Info Disclosure overlap here (API key in Actions log is both); keep **Credential Theft**, drop bare Disclosure, or merge into one secrets-exfil impact.
+
+---
+
+## 9. MCPoison primary — Check Point Research (Cursor MCP trust)
+
+**URL:** https://research.checkpoint.com/2025/cursor-vulnerability-mcpoison/
+
+CPR write-up for **CVE-2025-54136** only: Cursor MCP trust on entry name, not content; benign→malicious swap → persistent RCE / reverse shell. Fixed in Cursor **1.3**. (No CurXecute on this page.)
+
+**Pipeline:** 10 entities · previewed 2026-08-07T16:47:15 · merged 2026-08-07T21:29:08
+
+### Vulnerability (1)
+
+| vuln_id | title |
+|---|---|
+| CVE-2025-54136 | MCPoison Cursor IDE: Persistent Code Execution via MCP Trust Bypass |
+
+### Attack (3)
+
+| name | description |
+|---|---|
+| Command Injection | — |
+| Code Injection | Modifying the MCP configuration to execute a malicious command or payload. |
+| Social Engineering | An attacker performs a harmless commit to gain initial approval from the user. |
+
+### Impact (4)
+
+| name | description |
+|---|---|
+| Remote Code Execution | Execution of a reverse shell payload. |
+| Arbitrary Code Execution | — |
+| Persistence | The payload is re-evaluated and triggered every time the victim opens Cursor. |
+| Privilege Escalation | — |
+
+### Software (1)
+
+| name | is_ai | software_type | role |
+|---|---|---|---|
+| Cursor IDE | false | Application | affected |
+
+### Version (1)
+
+| version_string |
+|---|
+| 1.3 |
+
+**Notes / investigate**
+
+- Vulnerability hygiene **good**: one row `CVE-2025-54136` only — correctly no CurXecute bleed from Dark Reading #3. Title OK; description empty despite CPR having a clear write-up.
+- Attacks: **Code Injection** OK for command swap in MCP config; **Command Injection** overlaps / empty. **Social Engineering** for the harmless first commit is a stretch — mechanism is trust-on-name, not classic SE.
+- Impacts: **RCE** + **Persistence** on-target; **Arbitrary Code Execution** ≈ RCE dupe; **Privilege Escalation** thin / empty.
+- Software **Cursor IDE** `affected` right product, but `is_ai=false` is wrong (AI IDE). No Vendor (Cursor / Check Point). Version `1.3` is the **fix**, not affected-before.
+
+**Thoughts**
+
+- Cleaner than Dark Reading #3 on CVE identity (single finding) — crawl recovered and stayed on-story.
+- Biggest concrete bug: `is_ai=false` on Cursor IDE; next is empty vuln description + fix-only Version.
+- Prefer 1–2 Attacks (Code Injection ± Supply Chain) and 2 Impacts (RCE, Persistence) with descriptions filled.
+
+---
+
+## 10. MCP “by design” STDIO RCE — OX Security / THN
+
+**URL:** https://thehackernews.com/2026/04/anthropic-mcp-design-vulnerability.html
+
+OX Security: Anthropic MCP STDIO config→OS command defaults are unsafe “by design”; cascades into many downstream CVEs (LiteLLM, LangChain, Flowise, …) plus related-family ids (MCP Inspector, LibreChat, Cursor MCPoison, …).
+
+**Pipeline:** 36 entities · previewed 2026-08-07T16:39:08 · merged 2026-08-07T21:29:06
+
+### Vulnerability (15)
+
+| vuln_id |
+|---|
+| CVE-2025-65720 |
+| CVE-2026-30623 |
+| CVE-2026-30624 |
+| CVE-2026-30618 |
+| CVE-2026-33224 |
+| CVE-2026-30617 |
+| CVE-2026-30625 |
+| CVE-2026-30615 |
+| CVE-2026-26015 |
+| CVE-2026-40933 |
+| CVE-2025-49596 |
+| CVE-2026-22252 |
+| CVE-2026-22688 |
+| CVE-2025-54994 |
+| CVE-2025-54136 |
+
+### Attack (2)
+
+| name | description |
+|---|---|
+| Command Injection | Unauthenticated and authenticated command injection via MCP STDIO, configuration edit through zero-click prompt injection, or via marketplaces. |
+| Prompt Injection | Unauthenticated command injection via MCP configuration edit through zero-click prompt injection. |
+
+### Impact (2)
+
+| name | description |
+|---|---|
+| Remote Code Execution | Enables Arbitrary Command Execution (RCE) on any system running a vulnerable MCP implementation. |
+| Information Disclosure | Granting attackers direct access to sensitive user data, internal databases, API keys, and chat histories. |
+
+### Vendor (1)
+
+| name |
+|---|
+| Anthropic |
+
+### Software (16)
+
+| name | is_ai | software_type | role |
+|---|---|---|---|
+| Model Context Protocol (MCP) | true | Library | affected |
+| MCP SDK | true | Library | affected |
+| LiteLLM | true | Library | affected |
+| LangChain | true | Library | affected |
+| LangFlow | true | Application | affected |
+| Flowise | true | Application | affected |
+| LettaAI | true | Application | affected |
+| LangBot | true | Application | affected |
+| Model Context Protocol | true | Library | affected |
+| MCP Inspector | true | Application | affected |
+| LibreChat | true | Application | affected |
+| WeKnora | false | Application | affected |
+| @akoskm/create-mcp-server-stdio | true | Library | affected |
+| Cursor | true | Application | affected |
+| Burp | false | Application | tool |
+| sqlmap | false | Application | tool |
+
+**Notes / investigate**
+
+- Overall pretty solid for a THN supply-chain bundle.
+- 15 CVE ids harvested; titles/descriptions empty on every Vulnerability row.
+- Missing many CVE↔product links from the page (GPT Researcher, Agent Zero, Fay, DocsGPT, Windsurf, …); MCP name duplicated; Burp/sqlmap are page chrome as `tool`.
+- No separate narrative “MCP STDIO by design” finding — only the CVE list.
+
+**Thoughts**
+
+- Agree it’s solid **relative to how hard this page is**: Attack (Command Injection + PI) and Impact (RCE + Info Disclosure) match OX’s framing; Anthropic + MCP SDK / several named apps landed; CVE recall is the best in the queue.
+- Weaknesses are thin vuln shells (id-only) and incomplete Software map — ids without product/title make the graph hard to use, even if the count looks great.
+- For Track A scoring: treat as a **pass on coverage**, not a gold fixture for attribute quality. EchoLeak-class page, much better digression hygiene than EchoLeak (no SharePoint sidebar CVE).
+
+---
+
+## Track A trends (from this queue)
+
+9 scored extracts + 1 hard fail (#5 Semantic Kernel). Enough to steer prompt/pipeline work; not enough for statistical claims until we re-run a fixed prompt on the same URLs.
+
+### What it can do
+
+- Land the **headline story** on clean single-product pages (ClaudeBleed, Bleeding Llama, CPR MCPoison).
+- Pull **CVE ids** well when listed (#4 three CVEs, #10 fifteen ids).
+- Get **Vendor / primary Software / role=affected** right when the page is focused.
+- Reasonable **Attack + Impact names** for the main mechanism (Indirect PI, RCE, Credential Theft, Persistence).
+
+### What it can’t / doesn’t do reliably
+
+- **Attribute fill**: `description`, `date_published`, `cvss_*` often empty even when present in markdown (#1, #3 CurXecute, #4, #6, #9, #10).
+- **Stay on-story** on news bundles (#2 EchoLeak digression → GitHub/MCP as `affected`).
+- **Attack/Impact discipline**: glossary bleed, enum misfires (Model Extraction, Data Poisoning), empty-description noise, RCE≈ACE / Disclosure≈Exfil / Credential Theft≈Disclosure dupes.
+- **Software identity**: product name splits (Copilot×2, Git MCP×3), protocol-as-product (MCP `affected`), remediation aliases (“security review agent”).
+- **Version framing**: fix version alone (`1.3`, `0.17.1`) vs `prior to …`.
+- **Vulnerability cardinality**: oversplit minted rows (#7 three AISC, #8 remediation-as-vuln).
+- **Hard pages**: #5 Semantic Kernel almost empty — crawl/extract failure, not a soft miss.
+
+### Where it’s bad (ranked)
+
+1. Optional vuln attrs dropped despite being in text
+2. Extra Attack/Impact/Software from digressions, glossaries, remediation notes
+3. Name/role hygiene (dupes, `is_ai` flips, MCP-as-affected)
+4. Occasional full-page failure (#5)
+
+### Improve next (highest leverage)
+
+1. Prompt: “only fill attrs present in text; prefer fewer entities with descriptions; don’t emit glossary/remediation as Attack/Vuln.”
+2. Post-filters: collapse RCE/ACE, Disclosure/Exfil when same evidence; drop empty-description Attack noise; demote digression Software to `mentioned`.
+3. Version: prefer `affected before X` / don’t emit fix-only without framing.
+4. Re-test crawl on microsoft.com (#5) before trusting MS blogs.
+5. Prefer clean advisory pages as gold fixtures; keep THN bundles as stress tests only.
+
+---
+
+## Track A regression eval (fixture gold)
+
+Single run: `python -m extract_eval.regression.evaluate_regression` from `query_engine/` (source=fixture, model=default).  
+#5 Semantic Kernel not in suite. Scores are vs `extract_eval/regression/gold.yaml` — not the same as the earlier manual DB preview notes.
+
+### Suite (micro)
+
+| class | P | R | F1 | tp | fp | fn |
+|---|---:|---:|---:|---:|---:|---:|
+| Vulnerability | 0.929 | 1.000 | 0.963 | 13 | 1 | 0 |
+| Vendor | 1.000 | 0.750 | 0.857 | 9 | 0 | 3 |
+| Software | 0.722 | 0.929 | 0.813 | 13 | 5 | 1 |
+| Attack | 0.636 | 0.778 | 0.700 | 7 | 4 | 2 |
+| Impact | 0.765 | 0.867 | 0.812 | 13 | 4 | 2 |
+| **OVERALL** | **0.797** | **0.873** | **0.833** | **55** | **14** | **8** |
+
+### Per URL (overall P/R/F1 only)
+
+This console dump has **one micro score per doc** across headline classes — **not** per-class (Vuln/Vendor/…) breakdowns per URL. Those live in `--out report.json` → `per_doc.<id>.by_class` (tp/fp/fn, missed, false_positives).
+
+| # | doc id | URL | P | R | F1 |
+|---|---|---|---:|---:|---:|
+| 1 | securityweek-vulnerability-in-claude | https://www.securityweek.com/vulnerability-in-claude-extension-for-chrome-exposes-ai-agent-to-takeover/ | 1.000 | 1.000 | 1.000 |
+| 2 | thehackernews-zero-click-ai | https://thehackernews.com/2025/06/zero-click-ai-vulnerability-exposes.html | 0.818 | 0.818 | 0.818 |
+| 3 | darkreading-rce-flaw-in | https://www.darkreading.com/vulnerabilities-threats/rce-flaw-ai-coding-tool-supply-chain-risk | 0.667 | 0.800 | 0.727 |
+| 4 | theregister-anthropic-quietly-fixed | https://www.theregister.com/security/2026/01/20/anthropic-quietly-fixed-flaws-in-its-git-mcp-server/4676059 | 0.778 | 1.000 | 0.875 |
+| 6 | securityweek-critical-bug-could | https://www.securityweek.com/critical-bug-could-expose-300000-ollama-deployments-to-information-theft/ | 0.750 | 0.600 | 0.667 |
+| 7 | theregister-google-fixes-cvss | https://www.theregister.com/patches/2026/04/30/google-fixes-cvss-100-vulnerability-in-gemini-cli/5225768 | 0.800 | 1.000 | 0.889 |
+| 8 | securityweek-claude-code-gemini | https://www.securityweek.com/claude-code-gemini-cli-github-copilot-agents-vulnerable-to-prompt-injection-via-comments/ | 0.750 | 1.000 | 0.857 |
+| 9 | research-cursor-vulnerability-mcpoison | https://research.checkpoint.com/2025/cursor-vulnerability-mcpoison/ | 0.833 | 0.714 | 0.769 |
+| 10 | thehackernews-anthropic-mcp-design | https://thehackernews.com/2026/04/anthropic-mcp-design-vulnerability.html | 0.800 | 0.889 | 0.842 |
+
+**Read of this run (suite-level classes, not per-URL):** Vuln strongest; Attack weakest (precision); Vendor misses are recall-only (3 FN, 0 FP); Software/Impact middle with extra entities as FP.
+
+**To get class-by-class per URL next time:**
+
+```bash
+python -m extract_eval.regression.evaluate_regression --out track_a_report.json
+```

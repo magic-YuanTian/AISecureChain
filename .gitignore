@@ -55,6 +55,11 @@ CLAUDE.md
 .aider*
 .github/copilot-instructions.md
 
+# ── Local eval reports / working notes ─────────────────────────────────
+# Regenerable benchmark dumps, queues, and analysis scratch — keep on disk,
+# do not commit.
+local_reports/
+
 # ── Working notes, not documentation ─────────────────────────────────────
 # Dated work logs, progress summaries and slide decks belong in a notebook,
 # not in the repository. Durable docs go in README.md next to what they cover.

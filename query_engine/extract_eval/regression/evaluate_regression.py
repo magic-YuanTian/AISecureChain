@@ -86,9 +86,17 @@ def predicted_by_class(result) -> dict[str, list[dict]]:
     return out
 
 
-async def run_one(doc_id: str, gold_doc: dict, manifest: dict, source: str, max_chunks: int):
+async def run_one(
+    doc_id: str,
+    gold_doc: dict,
+    manifest: dict,
+    source: str,
+    max_chunks: int,
+    *,
+    re_clean: bool = False,
+):
     """Run extraction for one doc and score it. Returns (doc_id, per_class_scores, meta)."""
-    meta = {"doc_id": doc_id, "source": source}
+    meta = {"doc_id": doc_id, "source": source, "re_clean": re_clean}
     entry = manifest.get(doc_id, {})
 
     if source == "live":
@@ -103,8 +111,14 @@ async def run_one(doc_id: str, gold_doc: dict, manifest: dict, source: str, max_
             return doc_id, None, {**meta, "error": f"missing fixture {fname}"}
         with open(fpath, encoding="utf-8") as f:
             md = f.read()
+        # Default already_clean=True: fixtures were cleaned at build time.
+        # --re-clean runs clean_markdown_boilerplate again (regex or LLM via AISC_CLEAN_MODE).
         result = await run_pipeline_from_markdown(
-            md, url=entry.get("url", ""), skip_db=True, already_clean=True, max_chunks=max_chunks
+            md,
+            url=entry.get("url", ""),
+            skip_db=True,
+            already_clean=not re_clean,
+            max_chunks=max_chunks,
         )
 
     if result.errors:
@@ -329,7 +343,14 @@ async def _score_all(gold, manifest, args) -> tuple[dict, dict, dict]:
             async with lock:
                 started += 1
                 print(f"[start {started}/{total}] {doc_id}", flush=True)
-            result = await run_one(doc_id, gold[doc_id], manifest, args.source, args.max_chunks)
+            result = await run_one(
+                doc_id,
+                gold[doc_id],
+                manifest,
+                args.source,
+                args.max_chunks,
+                re_clean=bool(getattr(args, "re_clean", False)),
+            )
             async with lock:
                 finished += 1
                 err = result[2].get("error")
@@ -352,6 +373,8 @@ async def main_async(args) -> dict:
     cfg = {
         "source": args.source,
         "model": os.environ.get("AISC_LLM_MODEL", "(default)"),
+        "clean_mode": os.environ.get("AISC_CLEAN_MODE", "regex"),
+        "re_clean": bool(getattr(args, "re_clean", False)),
         "fixtures_dir": FIXTURES_DIR,
         "n_docs": len(doc_ids),
         "generated_at": _dt.datetime.now().isoformat(timespec="seconds"),
@@ -436,6 +459,17 @@ def main() -> None:
         help="Alternate fixtures directory (default: extract_eval/regression/fixtures). "
              "Must contain *.md and manifest.json.",
     )
+    ap.add_argument(
+        "--re-clean",
+        action="store_true",
+        help="Re-run clean_markdown_boilerplate on fixture markdown before extract "
+             "(needed to A/B AISC_CLEAN_MODE=llm vs regex; fixtures are already_clean by default).",
+    )
+    ap.add_argument(
+        "--clean-mode",
+        choices=["regex", "llm"],
+        help="Sets AISC_CLEAN_MODE for this run (use with --re-clean on fixtures).",
+    )
     ap.add_argument("--concurrency", type=int, default=4)
     ap.add_argument("--max-chunks", type=int, default=12)
     ap.add_argument("--repeat", type=int, default=1,
@@ -455,6 +489,8 @@ def main() -> None:
 
     if args.model:
         os.environ["AISC_LLM_MODEL"] = args.model
+    if getattr(args, "clean_mode", None):
+        os.environ["AISC_CLEAN_MODE"] = args.clean_mode
     if getattr(args, "fixtures_dir", None):
         _set_fixtures_dir(args.fixtures_dir)
 

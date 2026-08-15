@@ -318,10 +318,24 @@ def print_repeat_report(runs: list[dict], cfg: dict) -> dict:
 async def _score_all(gold, manifest, args) -> tuple[dict, dict, dict]:
     doc_ids = [d for d in gold if not args.only or d in set(args.only)]
     sem = asyncio.Semaphore(args.concurrency)
+    total = len(doc_ids)
+    started = 0
+    finished = 0
+    lock = asyncio.Lock()
 
     async def _guard(doc_id):
+        nonlocal started, finished
         async with sem:
-            return await run_one(doc_id, gold[doc_id], manifest, args.source, args.max_chunks)
+            async with lock:
+                started += 1
+                print(f"[start {started}/{total}] {doc_id}", flush=True)
+            result = await run_one(doc_id, gold[doc_id], manifest, args.source, args.max_chunks)
+            async with lock:
+                finished += 1
+                err = result[2].get("error")
+                flag = f"  ERROR: {err}" if err else ""
+                print(f"[done  {finished}/{total}] {doc_id}{flag}", flush=True)
+            return result
 
     results = await asyncio.gather(*[_guard(d) for d in doc_ids])
     per_doc_scores = {d: sc for d, sc, _m in results}
@@ -342,6 +356,11 @@ async def main_async(args) -> dict:
         "n_docs": len(doc_ids),
         "generated_at": _dt.datetime.now().isoformat(timespec="seconds"),
     }
+    print(
+        f"starting regression: {len(doc_ids)} docs  source={args.source}  "
+        f"model={cfg['model']}  fixtures={FIXTURES_DIR}",
+        flush=True,
+    )
 
     repeat = max(1, int(getattr(args, "repeat", 1) or 1))
     repeat_runs: list[dict] = []

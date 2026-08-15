@@ -59,6 +59,13 @@ FIXTURES_DIR = os.path.join(HERE, "fixtures")
 MANIFEST_PATH = os.path.join(FIXTURES_DIR, "manifest.json")
 
 
+def _set_fixtures_dir(path: str) -> None:
+    """Point fixture + manifest reads at an alternate directory (e.g. fixtures_llm_cleaned)."""
+    global FIXTURES_DIR, MANIFEST_PATH
+    FIXTURES_DIR = os.path.abspath(path)
+    MANIFEST_PATH = os.path.join(FIXTURES_DIR, "manifest.json")
+
+
 def load_gold() -> dict:
     with open(GOLD_PATH, encoding="utf-8") as f:
         return yaml.safe_load(f)["docs"]
@@ -328,9 +335,13 @@ async def main_async(args) -> dict:
     doc_ids = [d for d in gold if not args.only or d in set(args.only)]
 
     import datetime as _dt
-    cfg = {"source": args.source, "model": os.environ.get("AISC_LLM_MODEL", "(default)"),
-           "n_docs": len(doc_ids),
-           "generated_at": _dt.datetime.now().isoformat(timespec="seconds")}
+    cfg = {
+        "source": args.source,
+        "model": os.environ.get("AISC_LLM_MODEL", "(default)"),
+        "fixtures_dir": FIXTURES_DIR,
+        "n_docs": len(doc_ids),
+        "generated_at": _dt.datetime.now().isoformat(timespec="seconds"),
+    }
 
     repeat = max(1, int(getattr(args, "repeat", 1) or 1))
     repeat_runs: list[dict] = []
@@ -401,6 +412,11 @@ def main() -> None:
                     help="fixture = cached markdown (default, reproducible); live = re-crawl URLs")
     ap.add_argument("--only", nargs="*", help="Only evaluate these doc ids")
     ap.add_argument("--model", help="Override base LLM (sets AISC_LLM_MODEL for this run)")
+    ap.add_argument(
+        "--fixtures-dir",
+        help="Alternate fixtures directory (default: extract_eval/regression/fixtures). "
+             "Must contain *.md and manifest.json.",
+    )
     ap.add_argument("--concurrency", type=int, default=4)
     ap.add_argument("--max-chunks", type=int, default=12)
     ap.add_argument("--repeat", type=int, default=1,
@@ -420,6 +436,8 @@ def main() -> None:
 
     if args.model:
         os.environ["AISC_LLM_MODEL"] = args.model
+    if getattr(args, "fixtures_dir", None):
+        _set_fixtures_dir(args.fixtures_dir)
 
     asyncio.run(main_async(args))
 

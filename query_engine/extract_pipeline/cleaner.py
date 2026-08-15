@@ -4,10 +4,17 @@ The crawler intentionally preserves a lot of page chrome. That is useful for
 debugging, but bad for extraction: nav menus, product promos, related posts,
 share widgets, and footers look like real entities to the LLM. This module keeps
 the article body and drops common boilerplate before the LLM sees it.
+
+Two modes (``AISC_CLEAN_MODE``):
+  - ``regex`` (default): deterministic stop-patterns + dense-link scrub.
+  - ``llm``: send the page markdown to the same extraction LLM (``AISC_LLM_*``)
+    with a strict "article body only, do not summarize" prompt, then fall back
+    to regex if the model returns empty / collapses the page too aggressively.
 """
 
 from __future__ import annotations
 
+import os
 import re
 
 
@@ -57,6 +64,24 @@ _PROMO_START_PATTERNS = [
 _PROMO_END_PATTERNS = [
     r"^\s*\[?Learn more\s*(?:→|->)\]?",
 ]
+
+_LLM_CLEAN_SYSTEM = """\
+You clean crawled web-page markdown for a security-entity extraction pipeline.
+
+Return ONLY the main article body as markdown.
+Remove navigation, cookie banners, share widgets, related/recommended posts,
+"more like this", newsletters, webinars, expert insights sidebars, comments,
+author bios that appear after the article, and site footers.
+Keep the title, byline/date when they belong to the article, and every article
+paragraph, list, quote, and code block verbatim.
+
+Do NOT summarize, paraphrase, rewrite, or invent text. You may only delete
+sections/lines. If unsure whether something is chrome, keep it.
+Output the cleaned markdown only — no preamble or explanation."""
+
+# If the LLM returns less than this fraction of the input, treat as failure.
+_LLM_MIN_KEEP_RATIO = 0.25
+_LLM_MIN_CHARS = 200
 
 
 def _matches_any(line: str, patterns: list[str]) -> bool:
@@ -116,14 +141,8 @@ def _remove_dense_link_blocks(lines: list[str]) -> list[str]:
     return result
 
 
-def clean_markdown_boilerplate(markdown: str) -> str:
-    """Drop common non-article boilerplate from crawled Markdown.
-
-    The cleanup is deliberately conservative:
-    - keep content before the first heading only if there is no heading
-    - stop at known footer/share/related-post sections
-    - remove compact product-promo blocks embedded in articles
-    """
+def clean_markdown_regex(markdown: str) -> str:
+    """Deterministic boilerplate scrub (stop patterns + dense-link blocks)."""
     md = markdown.strip()
     if not md:
         return ""
@@ -168,4 +187,61 @@ def clean_markdown_boilerplate(markdown: str) -> str:
     return out
 
 
-__all__ = ["clean_markdown_boilerplate"]
+def _strip_fence(text: str) -> str:
+    t = text.strip()
+    if t.startswith("```"):
+        t = re.sub(r"^```(?:markdown|md)?\s*\n?", "", t, count=1, flags=re.IGNORECASE)
+        t = re.sub(r"\n?```\s*$", "", t)
+    return t.strip()
+
+
+def clean_markdown_llm(markdown: str) -> str:
+    """Ask the configured extraction LLM to return article-body markdown only."""
+    from utils.openai_api import get_response  # type: ignore
+
+    md = markdown.strip()
+    if not md:
+        return ""
+
+    messages = [
+        {"role": "system", "content": _LLM_CLEAN_SYSTEM},
+        {
+            "role": "user",
+            "content": (
+                "Clean the following crawled markdown. Return only the article body.\n\n"
+                f"```markdown\n{md}\n```"
+            ),
+        },
+    ]
+    raw = get_response(messages, temperature=0)
+    cleaned = _strip_fence(raw or "")
+
+    if len(cleaned) < _LLM_MIN_CHARS:
+        return ""
+    if len(cleaned) < _LLM_MIN_KEEP_RATIO * len(md):
+        return ""
+    return cleaned
+
+
+def clean_markdown_boilerplate(markdown: str) -> str:
+    """Drop common non-article boilerplate from crawled Markdown.
+
+    Mode is selected by ``AISC_CLEAN_MODE`` (``regex`` | ``llm``). LLM mode
+    uses the same ``AISC_LLM_*`` model as extraction (e.g. Gemma 26B) and falls
+    back to regex if the model returns empty or collapses the page too far.
+    """
+    mode = (os.environ.get("AISC_CLEAN_MODE") or "regex").strip().lower()
+    if mode == "llm":
+        cleaned = clean_markdown_llm(markdown)
+        if cleaned:
+            return cleaned
+        # Guardrail: keep going with regex rather than feeding empty / truncated body.
+        return clean_markdown_regex(markdown)
+    return clean_markdown_regex(markdown)
+
+
+__all__ = [
+    "clean_markdown_boilerplate",
+    "clean_markdown_regex",
+    "clean_markdown_llm",
+]

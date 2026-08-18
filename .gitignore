@@ -38,9 +38,11 @@ query_engine/extract_eval/regression/*.csv
 # Keep the Track A link list (source URLs for the active suite).
 !query_engine/extract_eval/regression/track_a_links.csv
 query_engine/extract_eval/regression/csv/
-# Local A/B fixture trees (oracle hand-strip / LLM-cleaned); stock fixtures/ stays tracked.
+# Local A/B fixture trees (oracle / LLM-cleaned / raw no-clean / smoke); stock fixtures/ stays tracked.
 query_engine/extract_eval/regression/fixtures_oracle/
 query_engine/extract_eval/regression/fixtures_llm_cleaned/
+query_engine/extract_eval/regression/fixtures_raw/
+query_engine/extract_eval/regression/fixtures_hf_smoke/
 # Ad-hoc link subset for the footer-clean experiment.
 test_links_footer8.csv
 query_engine/extract_eval/report*.json

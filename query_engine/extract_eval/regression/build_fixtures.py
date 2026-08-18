@@ -13,6 +13,7 @@ Usage:
     python -m extract_eval.regression.build_fixtures              # all rows in the CSV
     python -m extract_eval.regression.build_fixtures --only chrome-gemini latimes-claude
     python -m extract_eval.regression.build_fixtures --csv /path/to/links.csv
+    python -m extract_eval.regression.build_fixtures --no-clean --fixtures-dir extract_eval/regression/fixtures_raw
 
 Input CSV columns (header required): Category, Title, Source, Date, Link, Summary, Test
 Only ``Link`` (URL) and ``Title``/``Category`` (metadata) are used.
@@ -74,11 +75,18 @@ def read_rows(csv_path: str) -> list[dict]:
     return out
 
 
-async def build(rows: list[dict], only: set[str] | None) -> dict:
-    os.makedirs(FIXTURES_DIR, exist_ok=True)
+async def build(
+    rows: list[dict],
+    only: set[str] | None,
+    *,
+    fixtures_dir: str,
+    no_clean: bool = False,
+) -> dict:
+    os.makedirs(fixtures_dir, exist_ok=True)
+    manifest_path = os.path.join(fixtures_dir, "manifest.json")
     manifest = {}
-    if os.path.exists(MANIFEST_PATH):
-        with open(MANIFEST_PATH, encoding="utf-8") as f:
+    if os.path.exists(manifest_path):
+        with open(manifest_path, encoding="utf-8") as f:
             manifest = json.load(f)
 
     for row in rows:
@@ -92,19 +100,21 @@ async def build(rows: list[dict], only: set[str] | None) -> dict:
             entry["char_len"] = 0
             print(f"    ! {entry['crawl_error']}")
         else:
-            cleaned = clean_markdown_boilerplate(md)
-            fpath = os.path.join(FIXTURES_DIR, f"{row['id']}.md")
+            text = md if no_clean else clean_markdown_boilerplate(md)
+            fpath = os.path.join(fixtures_dir, f"{row['id']}.md")
             with open(fpath, "w", encoding="utf-8") as f:
-                f.write(cleaned)
+                f.write(text)
             entry["fixture_file"] = f"{row['id']}.md"
-            entry["char_len"] = len(cleaned)
+            entry["char_len"] = len(text)
             entry["crawl_error"] = None
-            print(f"    ok  {len(cleaned)} chars -> {entry['fixture_file']}")
+            if no_clean:
+                entry["note"] = "raw_crawl_no_clean"
+            print(f"    ok  {len(text)} chars -> {entry['fixture_file']}")
         manifest[row["id"]] = entry
 
-    with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
+    with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2, ensure_ascii=False)
-    print(f"\nmanifest -> {MANIFEST_PATH} ({len(manifest)} entries)")
+    print(f"\nmanifest -> {manifest_path} ({len(manifest)} entries)")
     return manifest
 
 
@@ -112,12 +122,30 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Crawl + freeze fixtures for the regression benchmark.")
     ap.add_argument("--csv", default=DEFAULT_CSV, help="Source CSV of links (default: repo test_links.csv)")
     ap.add_argument("--only", nargs="*", help="Only (re)build these fixture ids")
+    ap.add_argument(
+        "--fixtures-dir",
+        default=FIXTURES_DIR,
+        help="Output directory for .md fixtures + manifest.json (default: extract_eval/regression/fixtures)",
+    )
+    ap.add_argument(
+        "--no-clean",
+        action="store_true",
+        help="Save raw crawl markdown without clean_markdown_boilerplate",
+    )
     args = ap.parse_args()
 
+    fixtures_dir = os.path.abspath(args.fixtures_dir)
     rows = read_rows(args.csv)
     print(f"{len(rows)} rows in {args.csv}")
-    asyncio.run(build(rows, set(args.only) if args.only else None))
-
+    print(f"fixtures_dir={fixtures_dir}  no_clean={bool(args.no_clean)}")
+    asyncio.run(
+        build(
+            rows,
+            set(args.only) if args.only else None,
+            fixtures_dir=fixtures_dir,
+            no_clean=bool(args.no_clean),
+        )
+    )
 
 if __name__ == "__main__":
     main()

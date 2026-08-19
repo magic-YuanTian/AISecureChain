@@ -33,6 +33,27 @@ from .models import ExtractionGraph, PipelineResult
 from .persist import persist_canonical
 from .validator import validate_and_map_vulnerability_types
 
+# Cap concurrent per-chunk LLM calls. Unbounded gather hammered free-tier
+# OpenRouter (12 parallel → RateLimitError storms). Override via CLI or
+# AISC_MAX_PARALLEL_CHUNKS.
+DEFAULT_MAX_PARALLEL_CHUNKS = 4
+
+
+def resolve_max_parallel_chunks(explicit: int | None = None) -> int:
+    """Return max in-flight chunk extracts (≥1).
+
+    Precedence: explicit arg → ``AISC_MAX_PARALLEL_CHUNKS`` → default 4.
+    """
+    if explicit is not None:
+        return max(1, int(explicit))
+    raw = (os.environ.get("AISC_MAX_PARALLEL_CHUNKS") or "").strip()
+    if raw:
+        try:
+            return max(1, int(raw))
+        except ValueError:
+            pass
+    return DEFAULT_MAX_PARALLEL_CHUNKS
+
 
 # ── Fetch stage ────────────────────────────────────────────────────────────
 
@@ -69,6 +90,7 @@ async def run_pipeline(
     max_chars_per_chunk: int = 6000,
     overlap: int = 300,
     include_partial_in_db: bool = False,
+    max_parallel_chunks: int | None = None,
 ) -> PipelineResult:
     """Run the full pipeline for a single URL (crawl → … → persist)."""
     result = PipelineResult(url=url)
@@ -90,6 +112,7 @@ async def run_pipeline(
         max_chars_per_chunk=max_chars_per_chunk,
         overlap=overlap,
         include_partial_in_db=include_partial_in_db,
+        max_parallel_chunks=max_parallel_chunks,
         result=result,
     )
 
@@ -104,6 +127,7 @@ async def run_pipeline_from_markdown(
     overlap: int = 300,
     include_partial_in_db: bool = False,
     already_clean: bool = False,
+    max_parallel_chunks: int | None = None,
     result: PipelineResult | None = None,
 ) -> PipelineResult:
     """Run every post-fetch stage (clean → chunk → extract → merge → validate →
@@ -138,7 +162,7 @@ async def run_pipeline_from_markdown(
         )
         chunks = chunks[:max_chunks]
 
-    # 3. Extract (parallelised)
+    # 3. Extract (bounded parallelism — see resolve_max_parallel_chunks)
     system_prompt = build_system_prompt()
     import sys
     from pathlib import Path
@@ -146,10 +170,13 @@ async def run_pipeline_from_markdown(
     from utils.openai_api import empty_usage, merge_usage  # type: ignore
 
     extract_usage = empty_usage()
+    parallel = resolve_max_parallel_chunks(max_parallel_chunks)
+    sem = asyncio.Semaphore(parallel)
 
     async def _one(ci: int, chunk: str) -> tuple[int, ExtractionGraph, str | None, dict]:
-        g, e, u = await extract_graph(chunk, system_prompt=system_prompt)
-        return ci, g, e, u
+        async with sem:
+            g, e, u = await extract_graph(chunk, system_prompt=system_prompt)
+            return ci, g, e, u
 
     outs = await asyncio.gather(
         *[_one(i, c) for i, c in enumerate(chunks)],
@@ -235,10 +262,26 @@ def _cli() -> None:
     ap.add_argument("url")
     ap.add_argument("--skip-db", action="store_true", help="Do not write to SQLite")
     ap.add_argument("--max-chunks", type=int, default=12)
+    ap.add_argument(
+        "--max-parallel-chunks",
+        type=int,
+        default=None,
+        help=(
+            "Max concurrent chunk LLM calls (default: AISC_MAX_PARALLEL_CHUNKS "
+            f"or {DEFAULT_MAX_PARALLEL_CHUNKS})"
+        ),
+    )
     ap.add_argument("--json", dest="out_json", default=None, help="Write full result to JSON")
     args = ap.parse_args()
 
-    result = asyncio.run(run_pipeline(args.url, skip_db=args.skip_db, max_chunks=args.max_chunks))
+    result = asyncio.run(
+        run_pipeline(
+            args.url,
+            skip_db=args.skip_db,
+            max_chunks=args.max_chunks,
+            max_parallel_chunks=args.max_parallel_chunks,
+        )
+    )
 
     summary: dict[str, Any] = {
         "url": result.url,

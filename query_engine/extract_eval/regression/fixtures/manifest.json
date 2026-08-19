@@ -334,7 +334,16 @@
     "category": "Real-World Incidents & Exploits",
     "source": "Hugging Face",
     "fixture_file": "huggingface-security-incident-disclosure.md",
-    "char_len": 24359,
+    "char_len": 24368,
+    "crawl_error": null
+  },
+  "huggingface-agent-intrusion-technical": {
+    "url": "https://huggingface.co/blog/agent-intrusion-technical-timeline",
+    "title": "Agent intrusion technical timeline",
+    "category": "Real-World Incidents & Exploits",
+    "source": "Hugging Face",
+    "fixture_file": "huggingface-agent-intrusion-technical.md",
+    "char_len": 70282,
     "crawl_error": null
   }
 }

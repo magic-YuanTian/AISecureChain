@@ -94,6 +94,7 @@ async def run_one(
     max_chunks: int,
     *,
     re_clean: bool = False,
+    max_parallel_chunks: int | None = None,
 ):
     """Run extraction for one doc and score it. Returns (doc_id, per_class_scores, meta)."""
     meta = {"doc_id": doc_id, "source": source, "re_clean": re_clean}
@@ -103,7 +104,12 @@ async def run_one(
         url = entry.get("url") or gold_doc.get("url")
         if not url:
             return doc_id, None, {**meta, "error": "no url in manifest"}
-        result = await run_pipeline(url, skip_db=True, max_chunks=max_chunks)
+        result = await run_pipeline(
+            url,
+            skip_db=True,
+            max_chunks=max_chunks,
+            max_parallel_chunks=max_parallel_chunks,
+        )
     else:  # fixture
         fname = entry.get("fixture_file", f"{doc_id}.md")
         fpath = os.path.join(FIXTURES_DIR, fname)
@@ -119,6 +125,7 @@ async def run_one(
             skip_db=True,
             already_clean=not re_clean,
             max_chunks=max_chunks,
+            max_parallel_chunks=max_parallel_chunks,
         )
 
     if result.errors:
@@ -350,6 +357,7 @@ async def _score_all(gold, manifest, args) -> tuple[dict, dict, dict]:
                 args.source,
                 args.max_chunks,
                 re_clean=bool(getattr(args, "re_clean", False)),
+                max_parallel_chunks=getattr(args, "max_parallel_chunks", None),
             )
             async with lock:
                 finished += 1
@@ -472,6 +480,12 @@ def main() -> None:
     )
     ap.add_argument("--concurrency", type=int, default=4)
     ap.add_argument("--max-chunks", type=int, default=12)
+    ap.add_argument(
+        "--max-parallel-chunks",
+        type=int,
+        default=None,
+        help="Max concurrent chunk LLM calls per doc (default: AISC_MAX_PARALLEL_CHUNKS or 4)",
+    )
     ap.add_argument("--repeat", type=int, default=1,
                     help="Run the whole suite N times and report mean/stdev per metric. "
                          "Use >=3 before believing any headline delta (single-run noise is ~±0.03 F1).")

@@ -172,9 +172,16 @@ async def run_pipeline_from_markdown(
     extract_usage = empty_usage()
     parallel = resolve_max_parallel_chunks(max_parallel_chunks)
     sem = asyncio.Semaphore(parallel)
+    n_chunks = len(chunks)
+    print(
+        f"[extract] {n_chunks} chunk(s), max_parallel={parallel}",
+        file=sys.stderr,
+        flush=True,
+    )
 
     async def _one(ci: int, chunk: str) -> tuple[int, ExtractionGraph, str | None, dict]:
         async with sem:
+            print(f"[extract] chunk {ci}/{n_chunks - 1} start", file=sys.stderr, flush=True)
             g, e, u = await extract_graph(chunk, system_prompt=system_prompt)
             return ci, g, e, u
 
@@ -185,15 +192,35 @@ async def run_pipeline_from_markdown(
 
     for out in outs:
         if isinstance(out, Exception):
-            result.errors.append(f"chunk extraction failed: {out}")
+            msg = f"chunk extraction failed: {out}"
+            result.errors.append(msg)
+            print(f"[extract] FAIL {msg}", file=sys.stderr, flush=True)
             continue
         ci, g, e, u = out  # type: ignore[assignment]
         extract_usage = merge_usage(extract_usage, u)
+        n_ent = len(g.entities)
+        n_rel = len(g.relations)
         if e:
             result.warnings.append(f"chunk {ci}: {e}")
+            print(f"[extract] chunk {ci} FAIL: {e}", file=sys.stderr, flush=True)
+        elif n_ent or n_rel:
+            print(
+                f"[extract] chunk {ci} ok entities={n_ent} relations={n_rel}",
+                file=sys.stderr,
+                flush=True,
+            )
+        else:
+            result.warnings.append(f"chunk {ci}: empty graph (no entities/relations)")
+            print(f"[extract] chunk {ci} empty", file=sys.stderr, flush=True)
         if g.entities or g.relations:
             result.chunks_extracted += 1
             result.raw_graphs.append(g)
+
+    print(
+        f"[extract] done {result.chunks_extracted}/{n_chunks} chunks with entities",
+        file=sys.stderr,
+        flush=True,
+    )
 
     if not result.raw_graphs:
         result.errors.append("No extractions from any chunk.")
@@ -259,7 +286,21 @@ async def run_pipeline_from_markdown(
 
 def _cli() -> None:
     ap = argparse.ArgumentParser(description="AISecureChain extraction pipeline.")
-    ap.add_argument("url")
+    ap.add_argument(
+        "url",
+        nargs="?",
+        default="",
+        help="Page URL (crawl). Optional when --fixture is set.",
+    )
+    ap.add_argument(
+        "--fixture",
+        help="Run extract on a frozen markdown fixture instead of crawling a URL.",
+    )
+    ap.add_argument(
+        "--already-clean",
+        action="store_true",
+        help="With --fixture: skip clean_markdown_boilerplate (fixtures are usually pre-cleaned).",
+    )
     ap.add_argument("--skip-db", action="store_true", help="Do not write to SQLite")
     ap.add_argument("--max-chunks", type=int, default=12)
     ap.add_argument(
@@ -274,14 +315,34 @@ def _cli() -> None:
     ap.add_argument("--json", dest="out_json", default=None, help="Write full result to JSON")
     args = ap.parse_args()
 
-    result = asyncio.run(
-        run_pipeline(
-            args.url,
-            skip_db=args.skip_db,
-            max_chunks=args.max_chunks,
-            max_parallel_chunks=args.max_parallel_chunks,
+    if args.fixture:
+        from pathlib import Path
+
+        path = Path(args.fixture)
+        if not path.is_file():
+            ap.error(f"fixture not found: {path}")
+        md = path.read_text(encoding="utf-8")
+        result = asyncio.run(
+            run_pipeline_from_markdown(
+                md,
+                url=args.url or f"fixture://{path.name}",
+                skip_db=args.skip_db,
+                already_clean=args.already_clean,
+                max_chunks=args.max_chunks,
+                max_parallel_chunks=args.max_parallel_chunks,
+            )
         )
-    )
+    else:
+        if not args.url:
+            ap.error("url is required unless --fixture is set")
+        result = asyncio.run(
+            run_pipeline(
+                args.url,
+                skip_db=args.skip_db,
+                max_chunks=args.max_chunks,
+                max_parallel_chunks=args.max_parallel_chunks,
+            )
+        )
 
     summary: dict[str, Any] = {
         "url": result.url,

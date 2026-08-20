@@ -345,5 +345,14 @@
     "fixture_file": "huggingface-agent-intrusion-technical.md",
     "char_len": 70282,
     "crawl_error": null
+  },
+  "openai-hugging-face-evaluation": {
+    "url": "https://openai.com/index/hugging-face-model-evaluation-security-incident/",
+    "title": "Hugging Face evaluation security incident",
+    "category": "Real-World Incidents & Exploits",
+    "source": "OpenAI",
+    "fixture_file": "openai-hugging-face-evaluation.md",
+    "char_len": 3738,
+    "crawl_error": null
   }
 }

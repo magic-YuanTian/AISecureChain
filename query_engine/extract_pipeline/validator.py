@@ -5,8 +5,11 @@ records, then normalizes them. This module is the stricter post-pass before
 preview/persist:
 
 * ask the model to re-check extracted vulnerabilities against the source text;
-* force every kept Vulnerability to point at a predefined VulnerabilityType;
-* remove ad-hoc vulnerability-type labels that are not in the ontology data.
+* for CVE/GHSA ids, prefer CWEs from NVD / GitHub Advisories;
+* otherwise force kept Vulnerability records onto a predefined VulnerabilityType
+  (AISC / no-id findings keep the heuristic + LLM path);
+* remove ad-hoc vulnerability-type labels that are not in the ontology data
+  (except advisory-minted CWEs).
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ from typing import Any
 
 from rdflib import RDF, RDFS, Graph, URIRef
 
+from .advisory_cwe import is_advisory_id, lookup, pick_cwe_for_registry
 from .models import CanonicalEntity, CanonicalRelation
 from .ontology import ONT, TTL_PATH
 
@@ -492,6 +496,44 @@ async def _llm_validation_decisions(
     return decisions, usage
 
 
+def _resolve_advisory_cwes(
+    vulnerabilities: list[CanonicalEntity],
+    registry: dict[str, PredefinedVulnerabilityType],
+) -> tuple[dict[str, str], list[str], dict[str, str]]:
+    """Map Vulnerability canonical_key → CWE from NVD/GHSA when vuln_id is advisory.
+
+    Returns ``(type_by_key, warnings, minted_descriptions)`` where minted_descriptions
+    holds descriptions for CWEs not already in the TTL registry.
+    """
+    type_by_key: dict[str, str] = {}
+    warnings: list[str] = []
+    minted_descriptions: dict[str, str] = {}
+
+    for vuln in vulnerabilities:
+        vid = str(vuln.attributes.get("vuln_id") or "").strip()
+        if not is_advisory_id(vid):
+            continue
+        result = lookup(vid, follow_cve=True)
+        cwes = list(result.get("cwes") or [])
+        if not cwes:
+            err = result.get("error") or "no CWE"
+            warnings.append(f"Advisory CWE lookup missed for {vid}: {err}")
+            continue
+        chosen = pick_cwe_for_registry(cwes, registry)
+        if not chosen:
+            continue
+        type_by_key[vuln.canonical_key] = chosen
+        src = result.get("source") or "advisory"
+        if chosen not in registry and chosen not in minted_descriptions:
+            minted_descriptions[chosen] = f"Weakness {chosen} (from {src} for {vid.upper()})"
+        extra = ""
+        if len(cwes) > 1:
+            extra = f" (also {', '.join(cwes[1:])})"
+        warnings.append(f"Advisory CWE for {vid.upper()}: {chosen} via {src}{extra}")
+
+    return type_by_key, warnings, minted_descriptions
+
+
 async def validate_and_map_vulnerability_types(
     entities: list[CanonicalEntity],
     relations: list[CanonicalRelation],
@@ -499,7 +541,10 @@ async def validate_and_map_vulnerability_types(
     source_text: str,
     source_url: str = "",
 ) -> tuple[list[CanonicalEntity], list[CanonicalRelation], list[str], dict[str, Any]]:
-    """Validate final extraction and force every Vulnerability to a predefined type.
+    """Validate final extraction and map every Vulnerability to a VulnerabilityType.
+
+    CVE/GHSA ids prefer NVD/GitHub CWEs. AISC / no-id findings keep the old
+    heuristic + LLM force-map path.
 
     Returns ``(entities, relations, warnings, validation_usage)``.
     """
@@ -521,8 +566,27 @@ async def validate_and_map_vulnerability_types(
     vulnerabilities = [e for e in entities if e.class_name == "Vulnerability"]
     entities_by_key = {e.canonical_key: e for e in entities}
 
+    advisory_type_by_vuln, advisory_warnings, minted_type_descriptions = _resolve_advisory_cwes(
+        vulnerabilities, registry
+    )
+    warnings.extend(advisory_warnings)
+
     candidates_by_vuln: dict[str, list[PredefinedVulnerabilityType]] = {}
     for vuln in vulnerabilities:
+        # Advisory-mapped vulns: pin candidates to the advisory CWE so the LLM
+        # keep/drop pass still runs but cannot invent a conflicting type.
+        if vuln.canonical_key in advisory_type_by_vuln:
+            cwe = advisory_type_by_vuln[vuln.canonical_key]
+            if cwe in registry:
+                candidates_by_vuln[vuln.canonical_key] = [registry[cwe]]
+            else:
+                candidates_by_vuln[vuln.canonical_key] = [
+                    PredefinedVulnerabilityType(
+                        id=cwe,
+                        description=minted_type_descriptions.get(cwe, f"Weakness {cwe}"),
+                    )
+                ]
+            continue
         text = _entity_text(vuln)
         candidates_by_vuln[vuln.canonical_key] = _candidate_types(text, registry)
 
@@ -543,6 +607,13 @@ async def validate_and_map_vulnerability_types(
         corrected_title = decision.get("corrected_title")
         if isinstance(corrected_title, str) and corrected_title.strip():
             vuln.attributes["title"] = corrected_title.strip()
+
+        # Prefer advisory CWEs over LLM / heuristic guesses.
+        if vuln.canonical_key in advisory_type_by_vuln:
+            chosen = advisory_type_by_vuln[vuln.canonical_key]
+            keep_vuln_keys.add(vuln.canonical_key)
+            mapped_type_by_vuln[vuln.canonical_key] = chosen
+            continue
 
         allowed = {vt.id for vt in candidates_by_vuln.get(vuln.canonical_key, [])}
         chosen = str(decision.get("mapped_type_id") or "").strip().upper()
@@ -653,11 +724,18 @@ async def validate_and_map_vulnerability_types(
             continue
         if ent.class_name == "VulnerabilityType":
             type_id = str(ent.attributes.get("id") or "").strip().upper()
-            if type_id not in registry or _type_key(type_id) not in type_keys_needed:
+            known = type_id in registry or type_id in minted_type_descriptions
+            if not known or _type_key(type_id) not in type_keys_needed:
                 continue
             ent.canonical_key = _type_key(type_id)
             ent.attributes["id"] = type_id
-            ent.attributes.setdefault("description", registry[type_id].description)
+            if type_id in registry:
+                ent.attributes.setdefault("description", registry[type_id].description)
+            else:
+                ent.attributes.setdefault(
+                    "description",
+                    minted_type_descriptions.get(type_id, f"Weakness {type_id}"),
+                )
         new_entities.append(ent)
         existing_keys.add(ent.canonical_key)
 
@@ -665,11 +743,18 @@ async def validate_and_map_vulnerability_types(
         key = _type_key(type_id)
         if key in existing_keys:
             continue
-        vt = registry[type_id]
+        if type_id in registry:
+            vt = registry[type_id]
+            type_attrs = {"id": vt.id, "description": vt.description}
+        else:
+            type_attrs = {
+                "id": type_id,
+                "description": minted_type_descriptions.get(type_id, f"Weakness {type_id}"),
+            }
         new_entities.append(CanonicalEntity(
             class_name="VulnerabilityType",
             canonical_key=key,
-            attributes={"id": vt.id, "description": vt.description},
+            attributes=type_attrs,
             confidence=1.0,
         ))
         existing_keys.add(key)

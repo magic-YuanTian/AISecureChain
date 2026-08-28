@@ -3,8 +3,7 @@
 
 docs:
   thehackernews-new-chrome-vulnerability:
-    notes: CVE-2026-0628 (CVSS 8.8) insufficient policy enforcement in Chrome WebView; malicious extension
-      hijacks Gemini Live panel.
+    notes: CVE-2026-0628 (CVSS 8.8) insufficient policy enforcement in Chrome WebView; malicious extension hijacks Gemini Live panel.
     classes:
       Vulnerability:
         required:
@@ -62,10 +61,11 @@ docs:
           - Camera Access
           - Microphone Access
       VulnerabilityType:
-        required: []
+        required:
+        - name: CWE-862
+        acceptable: []
   research-caught-in-the:
-    notes: 'Check Point: CVE-2025-59536 (RCE via hooks/MCP) + CVE-2026-21852 (API key exfil via ANTHROPIC_BASE_URL)
-      in Anthropic Claude Code. GHSA-ph6w-f82w-28w6 is the first advisory.'
+    notes: 'Check Point: CVE-2025-59536 (RCE via hooks/MCP) + CVE-2026-21852 (API key exfil via ANTHROPIC_BASE_URL) in Anthropic Claude Code. GHSA-ph6w-f82w-28w6 is the first advisory.'
     classes:
       Vulnerability:
         required:
@@ -161,8 +161,7 @@ docs:
         acceptable:
         - name: CWE-94
   latimes-hacker-used-anthropic:
-    notes: 'Gambit Security: attacker jailbroke Claude to find vulns, write exploits, exfiltrate 150GB
-      Mexican gov data. ChatGPT used as a secondary tool. No CVE — one central misuse finding.'
+    notes: 'Gambit Security: attacker jailbroke Claude to find vulns, write exploits, exfiltrate 150GB Mexican gov data. ChatGPT used as a secondary tool. No CVE — one central misuse finding.'
     classes:
       Vulnerability:
         required:
@@ -231,9 +230,9 @@ docs:
           - Identity Compromise
       VulnerabilityType:
         required: []
+        acceptable: []
   cyberscoop-uk-cyber-agency:
-    notes: 'NCSC: prompt injection is inherent to LLM architecture. Conceptual — one central finding,
-      no CVE. Products are examples only (ChatGPT).'
+    notes: 'NCSC: prompt injection is inherent to LLM architecture. Conceptual — one central finding, no CVE. Products are examples only (ChatGPT).'
     classes:
       Vulnerability:
         required:
@@ -279,8 +278,7 @@ docs:
         acceptable:
         - name: CWE-1427
   unit42-investigating-llm-jailbreaking:
-    notes: Unit 42 jailbroke 17 GenAI web products; products ANONYMIZED → no named vendor/software should
-      be extracted. One central finding.
+    notes: Unit 42 jailbroke 17 GenAI web products; products ANONYMIZED → no named vendor/software should be extracted. One central finding.
     classes:
       Vulnerability:
         required:
@@ -344,9 +342,9 @@ docs:
         - name: Criminal Activity
       VulnerabilityType:
         required: []
+        acceptable: []
   blog-nation-state-threat:
-    notes: 'GTIG: nation-state actors abuse Gemini/ChatGPT/Copilot/DeepSeek/Grok guardrails for phishing
-      + ClickFix malware. One central misuse finding; many tools named.'
+    notes: 'GTIG: nation-state actors abuse Gemini/ChatGPT/Copilot/DeepSeek/Grok guardrails for phishing + ClickFix malware. One central misuse finding; many tools named.'
     classes:
       Vulnerability:
         required:
@@ -407,9 +405,9 @@ docs:
         - name: Reconnaissance
       VulnerabilityType:
         required: []
+        acceptable: []
   neuraltrust-ai-driven-supply:
-    notes: 'NeuralTrust thought-leadership; case studies anonymized (Logistics SaaS, MedTech). Attack
-      vectors: data poisoning, AI malware, deepfake vendor impersonation. No named products/CVEs.'
+    notes: 'NeuralTrust thought-leadership; case studies anonymized (Logistics SaaS, MedTech). Attack vectors: data poisoning, AI malware, deepfake vendor impersonation. No named products/CVEs.'
     classes:
       Vulnerability:
         required:
@@ -492,10 +490,9 @@ docs:
           - Model Poisoning
       VulnerabilityType:
         required: []
+        acceptable: []
   welivesecurity-this-month-in:
-    notes: 'ESET/Tony Anscombe Feb-2026 roundup. Central AI finding: threat actors misused commercial
-      GenAI to compromise 600+ FortiGate devices. Text explicitly says ''rather than specific vulnerabilities''
-      → Vulnerability must NOT be required. ESET is the publisher → acceptable, not required.'
+    notes: 'ESET/Tony Anscombe Feb-2026 roundup. Central AI finding: threat actors misused commercial GenAI to compromise 600+ FortiGate devices. Text explicitly says ''rather than specific vulnerabilities'' → Vulnerability must NOT be required. ESET is the publisher → acceptable, not required.'
     classes:
       Vulnerability:
         required: []
@@ -602,9 +599,7 @@ docs:
         acceptable:
         - name: CWE-1390
   adversa-top-ai-security:
-    notes: 'Press release for an incidents report. No CVEs (anti-hallucination on Vulnerability). Named
-      failed systems: Amazon Q, Microsoft Azure, OmniGPT, ElizaOS (+ Bing, Asana as case studies). Prompt
-      injection = 35% of incidents.'
+    notes: 'Press release for an incidents report. No CVEs (anti-hallucination on Vulnerability). Named failed systems: Amazon Q, Microsoft Azure, OmniGPT, ElizaOS (+ Bing, Asana as case studies). Prompt injection = 35% of incidents.'
     classes:
       Vulnerability:
         required: []
@@ -700,9 +695,9 @@ docs:
           - Supply Chain Compromise
       VulnerabilityType:
         required: []
+        acceptable: []
   blog-agentic-ai-the:
-    notes: Barracuda thought-leadership on agentic-AI-driven attacks. No CVE, no vulnerable product (FortiGate
-      named only as a past incident example). Mostly a precision / anti-hallucination test.
+    notes: Barracuda thought-leadership on agentic-AI-driven attacks. No CVE, no vulnerable product (FortiGate named only as a past incident example). Mostly a precision / anti-hallucination test.
     classes:
       Vulnerability:
         required: []
@@ -773,9 +768,9 @@ docs:
         - name: Reconnaissance
       VulnerabilityType:
         required: []
+        acceptable: []
   blog-owasp-top-10:
-    notes: Walkthrough of all 10 OWASP LLM risks. No CVEs, no vulnerable products. Rich in Attack/Impact
-      concepts; risk names may surface as Vulnerability OR Attack — acceptable shields either framing.
+    notes: Walkthrough of all 10 OWASP LLM risks. No CVEs, no vulnerable products. Rich in Attack/Impact concepts; risk names may surface as Vulnerability OR Attack — acceptable shields either framing.
     classes:
       Vulnerability:
         required: []
@@ -912,9 +907,7 @@ docs:
         acceptable:
         - name: CWE-1427
   obsidiansecurity-prompt-injection-attacks:
-    notes: 'Long defense-oriented guide. Central finding: prompt injection (no CVE). Named tech (Splunk,
-      Azure, AWS, Salesforce/Salesloft/Drift) appears only in defense examples or the sidebar breach story
-      — acceptable, not required.'
+    notes: 'Long defense-oriented guide. Central finding: prompt injection (no CVE). Named tech (Splunk, Azure, AWS, Salesforce/Salesloft/Drift) appears only in defense examples or the sidebar breach story — acceptable, not required.'
     classes:
       Vulnerability:
         required:
@@ -1055,9 +1048,7 @@ docs:
         acceptable:
         - name: CWE-1427
   linkedin-kicking-off-the:
-    notes: Project announcement + survey call. Contains essentially NO extractable security entities —
-      every class has empty required. Any non-acceptable prediction is a false positive. Tests restraint
-      on boilerplate-heavy social pages.
+    notes: Project announcement + survey call. Contains essentially NO extractable security entities — every class has empty required. Any non-acceptable prediction is a false positive. Tests restraint on boilerplate-heavy social pages.
     classes:
       Vulnerability:
         required: []
@@ -1118,9 +1109,9 @@ docs:
           - Model Tampering
       VulnerabilityType:
         required: []
+        acceptable: []
   nvd-emailgpt-prompt-injection:
-    notes: 'NVD detail page for CVE-2024-5184: prompt injection in the EmailGPT API service. Vendor/product
-      EmailGPT; CWE-74; source Synopsys. NVD change-history boilerplate adds noise.'
+    notes: 'NVD detail page for CVE-2024-5184: prompt injection in the EmailGPT API service. Vendor/product EmailGPT; CWE-74; source Synopsys. NVD change-history boilerplate adds noise.'
     classes:
       Vulnerability:
         required:
@@ -1172,8 +1163,7 @@ docs:
         acceptable:
         - name: CWE-74
   nvd-langchain-palchain-code:
-    notes: 'NVD detail for CVE-2023-36258: arbitrary code execution via PALChain python exec in LangChain
-      < 0.0.236. CWE-94 (CISA-ADP). No vendor field on NVD.'
+    notes: 'NVD detail for CVE-2023-36258: arbitrary code execution via PALChain python exec in LangChain < 0.0.236. CWE-94 (CISA-ADP). No vendor field on NVD.'
     classes:
       Vulnerability:
         required:
@@ -1216,8 +1206,7 @@ docs:
         - name: CWE-94
         - name: CWE-74
   github-langchain-ssrf-advisory:
-    notes: 'GitHub Security Advisory GHSA-7gfq-f96f-g85j (CVE-2023-36281) in langchain-ai/langchain: code
-      injection via load_prompt / Jinja2 template SSTI. CWE-94. Page is mostly CVSS-metric boilerplate.'
+    notes: 'GitHub Security Advisory GHSA-7gfq-f96f-g85j (CVE-2023-36281) in langchain-ai/langchain: code injection via load_prompt / Jinja2 template SSTI. CWE-94. Page is mostly CVSS-metric boilerplate.'
     classes:
       Vulnerability:
         required:
@@ -1257,9 +1246,7 @@ docs:
         acceptable:
         - name: CWE-94
   github-langchain-sql-injection:
-    notes: 'GitHub Security Advisory GHSA-56xg-wfcc-g829 (CVE-2024-34359, ''Llama Drama''): RCE via unsafe
-      Jinja2 chat_template in abetlen/llama-cpp-python. CWE-76. (id kept from crawl slug; content is the
-      llama-cpp advisory.)'
+    notes: 'GitHub Security Advisory GHSA-56xg-wfcc-g829 (CVE-2024-34359, ''Llama Drama''): RCE via unsafe Jinja2 chat_template in abetlen/llama-cpp-python. CWE-76. (id kept from crawl slug; content is the llama-cpp advisory.)'
     classes:
       Vulnerability:
         required:
@@ -1300,9 +1287,7 @@ docs:
         - name: CWE-76
         - name: CWE-94
   embracethered-chatgpt-hacking-memories:
-    notes: 'Embrace The Red: indirect prompt injection via Connected Apps / image upload / browsing writes
-      persistent false memories into ChatGPT. OpenAI closed it as ''model safety'', not a CVE. One central
-      finding.'
+    notes: 'Embrace The Red: indirect prompt injection via Connected Apps / image upload / browsing writes persistent false memories into ChatGPT. OpenAI closed it as ''model safety'', not a CVE. One central finding.'
     classes:
       Vulnerability:
         required:
@@ -1362,11 +1347,11 @@ docs:
           aliases:
           - Behavior Override
       VulnerabilityType:
-        required: []
+        required:
+        - name: CWE-1427
+        acceptable: []
   embracethered-copilot-ascii-smuggling:
-    notes: 'Embrace The Red: full M365 Copilot exploit chain — prompt injection + automatic tool invocation
-      + ASCII smuggling + hyperlink rendering to exfiltrate emails/PII. Disclosed to MSRC, fixed. One
-      central finding.'
+    notes: 'Embrace The Red: full M365 Copilot exploit chain — prompt injection + automatic tool invocation + ASCII smuggling + hyperlink rendering to exfiltrate emails/PII. Disclosed to MSRC, fixed. One central finding.'
     classes:
       Vulnerability:
         required:
@@ -1425,9 +1410,7 @@ docs:
         acceptable:
         - name: CWE-1427
   blog-pickle-file-attacks:
-    notes: 'Trail of Bits: ''Sleepy Pickle'' — malicious pickle payloads (via Fickling) compromise the
-      ML model itself on deserialization to insert backdoors, steal data, or phish. Model supply-chain
-      finding; no CVE.'
+    notes: 'Trail of Bits: ''Sleepy Pickle'' — malicious pickle payloads (via Fickling) compromise the ML model itself on deserialization to insert backdoors, steal data, or phish. Model supply-chain finding; no CVE.'
     classes:
       Vulnerability:
         required:
@@ -1560,9 +1543,7 @@ docs:
         acceptable:
         - name: CWE-502
   hiddenlayer-shadowlogic-backdoor-technique:
-    notes: 'HiddenLayer: ''ShadowLogic'' implants no-code logic backdoors directly in a model''s computational
-      graph (ONNX/PyTorch/TensorFlow), persisting across fine-tuning. Demonstrated on ResNet, YOLO, Phi-3.
-      Research technique; no CVE.'
+    notes: 'HiddenLayer: ''ShadowLogic'' implants no-code logic backdoors directly in a model''s computational graph (ONNX/PyTorch/TensorFlow), persisting across fine-tuning. Demonstrated on ResNet, YOLO, Phi-3. Research technique; no CVE.'
     classes:
       Vulnerability:
         required:
@@ -1656,10 +1637,9 @@ docs:
         - name: Unauthorized Access
       VulnerabilityType:
         required: []
+        acceptable: []
   lakera-visual-prompt-injections:
-    notes: 'Lakera hackathon writeup: visual prompt injections — malicious instructions embedded in images
-      override GPT-4V behavior (invisibility cloak, captcha bypass, off-white text). Concept finding;
-      no CVE. Lakera-product boilerplate adds noise.'
+    notes: 'Lakera hackathon writeup: visual prompt injections — malicious instructions embedded in images override GPT-4V behavior (invisibility cloak, captcha bypass, off-white text). Concept finding; no CVE. Lakera-product boilerplate adds noise.'
     classes:
       Vulnerability:
         required:
@@ -1724,7 +1704,9 @@ docs:
           - Advertising Manipulation
           - Suppression of Competing Content
       VulnerabilityType:
-        required: []
+        required:
+        - name: CWE-1427
+        acceptable: []
   securityweek-vulnerability-in-claude:
     notes: ClaudeBleed — title clearly ClaudeBleed; remote/indirect PI; Anthropic + Claude Chrome extension.
     url: https://www.securityweek.com/vulnerability-in-claude-extension-for-chrome-exposes-ai-agent-to-takeover/
@@ -1765,6 +1747,12 @@ docs:
           aliases:
           - Unauthorized Actions
           - AI Agent Takeover
+      VulnerabilityType:
+        required: []
+        acceptable:
+        - name: CWE-346
+        - name: CWE-940
+        - name: CWE-1427
   thehackernews-zero-click-ai:
     notes: 'Option B — score whole THN page: EchoLeak lead + MCP TPA/FSP + GitHub MCP + DNS rebinding.'
     url: https://thehackernews.com/2025/06/zero-click-ai-vulnerability-exposes.html
@@ -1831,6 +1819,10 @@ docs:
         - name: Information Disclosure
         acceptable:
         - name: Remote Code Execution
+      VulnerabilityType:
+        required:
+        - name: CWE-1427
+        acceptable: []
   darkreading-rce-flaw-in:
     notes: MCPoison lead + CurXecute side note; both CVEs on page.
     url: https://www.darkreading.com/vulnerabilities-threats/rce-flaw-ai-coding-tool-supply-chain-risk
@@ -1882,6 +1874,11 @@ docs:
         - name: Privilege Escalation
         - name: Data Exfiltration
         - name: Information Disclosure
+      VulnerabilityType:
+        required:
+        - name: CWE-78
+        acceptable:
+        - name: CWE-1427
   theregister-anthropic-quietly-fixed:
     notes: Three Cyata CVEs in Anthropic mcp-server-git; clients Copilot/Claude/Cursor mentioned only.
     url: https://www.theregister.com/security/2026/01/20/anthropic-quietly-fixed-flaws-in-its-git-mcp-server/4676059
@@ -1931,6 +1928,10 @@ docs:
           - Arbitrary File Overwrite
         - name: File Deletion
         - name: Information Disclosure
+      VulnerabilityType:
+        required:
+        - name: CWE-1427
+        acceptable: []
   securityweek-critical-bug-could:
     notes: Bleeding Llama CVE-2026-7482 — heap OOB + model-push exfil; not model extraction.
     url: https://www.securityweek.com/critical-bug-could-expose-300000-ollama-deployments-to-information-theft/
@@ -1953,10 +1954,12 @@ docs:
         required:
         - name: Information Disclosure
         - name: Data Exfiltration
+      VulnerabilityType:
+        required:
+        - name: CWE-125
+        acceptable: []
   theregister-google-fixes-cvss:
-    notes: No CVE yet (GHSA on page); minted AISC ok. Match via title_any on title/description/vuln_id
-      — minted ids are NOT excluded. One required finding (headless/.gemini trust RCE); --yolo allowlist
-      change is acceptable second row.
+    notes: No CVE yet (GHSA on page); minted AISC ok. Match via title_any on title/description/vuln_id — minted ids are NOT excluded. One required finding (headless/.gemini trust RCE); --yolo allowlist change is acceptable second row.
     url: https://www.theregister.com/patches/2026/04/30/google-fixes-cvss-100-vulnerability-in-gemini-cli/5225768
     classes:
       Vulnerability:
@@ -2004,10 +2007,13 @@ docs:
         acceptable:
         - name: Credential Theft
         - name: Information Disclosure
+      VulnerabilityType:
+        required:
+        - name: CWE-829
+        acceptable:
+        - name: CWE-1427
   securityweek-claude-code-gemini:
-    notes: Comment and Control — one PI pattern across three agents (minted AISC ok). Do not accept remediation
-      commentary (“overly broad tool access”) as a second vuln, or generic “security review agent” as
-      Software.
+    notes: Comment and Control — one PI pattern across three agents (minted AISC ok). Do not accept remediation commentary (“overly broad tool access”) as a second vuln, or generic “security review agent” as Software.
     url: https://www.securityweek.com/claude-code-gemini-cli-github-copilot-agents-vulnerable-to-prompt-injection-via-comments/
     classes:
       Vulnerability:
@@ -2052,10 +2058,12 @@ docs:
         - name: Arbitrary Code Execution
           aliases:
           - Remote Code Execution
+      VulnerabilityType:
+        required:
+        - name: CWE-1427
+        acceptable: []
   research-cursor-vulnerability-mcpoison:
-    notes: CPR MCPoison only — CVE-2025-54136, no CurXecute. Mechanism is MCP name-bound trust + command
-      swap (not prompt injection). Fixed in Cursor 1.3; ideal Version is “before/prior to 1.3”, but Version
-      is not scored in this suite yet (matcher looks at name/id/title, not version_string).
+    notes: CPR MCPoison only — CVE-2025-54136, no CurXecute. Mechanism is MCP name-bound trust + command swap (not prompt injection). Fixed in Cursor 1.3; ideal Version is “before/prior to 1.3”, but Version is not scored in this suite yet (matcher looks at name/id/title, not version_string).
     url: https://research.checkpoint.com/2025/cursor-vulnerability-mcpoison/
     classes:
       Vulnerability:
@@ -2097,10 +2105,12 @@ docs:
         - name: Credential Theft
         - name: Information Disclosure
         - name: Data Exfiltration
+      VulnerabilityType:
+        required:
+        - name: CWE-78
+        acceptable: []
   thehackernews-anthropic-mcp-design:
-    notes: 'OX MCP STDIO by-design supply-chain bundle. Require a small CVE recall subset + MCP/Anthropic;
-      other listed CVEs/products acceptable. Lead OX quote: RCE plus access to sensitive user data, DBs,
-      API keys, chat histories.'
+    notes: 'OX MCP STDIO by-design supply-chain bundle. Require a small CVE recall subset + MCP/Anthropic; other listed CVEs/products acceptable. Lead OX quote: RCE plus access to sensitive user data, DBs, API keys, chat histories.'
     url: https://thehackernews.com/2026/04/anthropic-mcp-design-vulnerability.html
     classes:
       Vulnerability:
@@ -2178,3 +2188,7 @@ docs:
         - name: Credential Theft
         acceptable:
         - name: Data Exfiltration
+      VulnerabilityType:
+        required:
+        - name: CWE-78
+        acceptable: []

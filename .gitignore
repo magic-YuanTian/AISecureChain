@@ -77,6 +77,12 @@ NOTES.md
 TODO.md
 sanjay_notes.md
 
+# ── Reference data / derived indexes ─────────────────────────────────────
+# The MITRE CWE catalog is an 18MB upstream download, and the embedding index
+# is built from it. Fetch and rebuild rather than committing either.
+cwec_*.xml
+query_engine/data/cwe_faiss/
+
 # ── Python ───────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]

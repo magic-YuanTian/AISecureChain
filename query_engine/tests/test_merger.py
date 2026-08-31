@@ -7,14 +7,16 @@ from extract_pipeline.models import (
     ExtractionGraph,
 )
 
+DESC = "The product accepts untrusted input that can override intended behavior."
+
 
 def _mk(cls, lid, **attrs):
     return ExtractedEntity(**{"class": cls, "local_id": lid, "attributes": attrs})
 
 
 def test_same_vuln_across_chunks_merges():
-    g1 = ExtractionGraph(entities=[_mk("Vulnerability", "v", vuln_id="CVE-2024-0001", cvss_base_score=7.5)])
-    g2 = ExtractionGraph(entities=[_mk("Vulnerability", "v", vuln_id="CVE-2024-0001", cvss_severity="HIGH", title="Foo")])
+    g1 = ExtractionGraph(entities=[_mk("Vulnerability", "v", vuln_id="CVE-2024-0001", description=DESC, cvss_base_score=7.5)])
+    g2 = ExtractionGraph(entities=[_mk("Vulnerability", "v", vuln_id="CVE-2024-0001", description=DESC, cvss_severity="HIGH", title="Foo")])
     ents, _rels = merge_graphs([g1, g2])
     vulns = [e for e in ents if e.class_name == "Vulnerability"]
     assert len(vulns) == 1
@@ -26,15 +28,15 @@ def test_same_vuln_across_chunks_merges():
 
 
 def test_attribute_union_list_fields():
-    g1 = ExtractionGraph(entities=[_mk("Vulnerability", "v", vuln_id="CVE-X-1", references=["a", "b"])])
-    g2 = ExtractionGraph(entities=[_mk("Vulnerability", "v", vuln_id="CVE-X-1", references=["b", "c"])])
+    g1 = ExtractionGraph(entities=[_mk("Vulnerability", "v", vuln_id="CVE-X-1", description=DESC, references=["a", "b"])])
+    g2 = ExtractionGraph(entities=[_mk("Vulnerability", "v", vuln_id="CVE-X-1", description=DESC, references=["b", "c"])])
     ents, _ = merge_graphs([g1, g2])
     assert ents[0].attributes["references"] == ["a", "b", "c"]
 
 
 def test_longest_text_wins():
-    g1 = ExtractionGraph(entities=[_mk("Vulnerability", "v", vuln_id="CVE-X-2", title="short")])
-    g2 = ExtractionGraph(entities=[_mk("Vulnerability", "v", vuln_id="CVE-X-2", title="a much longer title")])
+    g1 = ExtractionGraph(entities=[_mk("Vulnerability", "v", vuln_id="CVE-X-2", title="short", description=DESC)])
+    g2 = ExtractionGraph(entities=[_mk("Vulnerability", "v", vuln_id="CVE-X-2", title="a much longer title", description=DESC)])
     ents, _ = merge_graphs([g1, g2])
     assert ents[0].attributes["title"] == "a much longer title"
 
@@ -64,9 +66,17 @@ def test_missing_required_flags_partial():
     ents, _ = merge_graphs([g])
     assert not ents, "Empty vuln should be dropped"
 
-    # Vulnerability with a title but no official id: the system mints an
-    # internal AISC id so the novel finding is captured (not partial).
-    g2 = ExtractionGraph(entities=[_mk("Vulnerability", "v", title="Unnamed")])
+    # Title but no description is dropped even when an AISC id could be minted.
+    g_nodesc = ExtractionGraph(entities=[_mk("Vulnerability", "v", title="Unnamed")])
+    ents_nodesc, _ = merge_graphs([g_nodesc])
+    assert not ents_nodesc, "Vulnerability without description should be dropped"
+
+    g_cve = ExtractionGraph(entities=[_mk("Vulnerability", "v", vuln_id="CVE-2024-0001", title="Named")])
+    ents_cve, _ = merge_graphs([g_cve])
+    assert not ents_cve, "CVE without description should be dropped"
+
+    # Title + description, no official id: mint an internal AISC id.
+    g2 = ExtractionGraph(entities=[_mk("Vulnerability", "v", title="Unnamed", description=DESC)])
     ents2, _ = merge_graphs([g2])
     assert len(ents2) == 1
     assert ents2[0].is_partial is False
@@ -92,8 +102,8 @@ def test_software_is_ai_false_is_not_partial():
 
 
 def test_minted_vuln_id_is_deterministic():
-    g1 = ExtractionGraph(entities=[_mk("Vulnerability", "v", title="Indirect prompt injection in Foo")])
-    g2 = ExtractionGraph(entities=[_mk("Vulnerability", "v", title="Indirect prompt injection in Foo")])
+    g1 = ExtractionGraph(entities=[_mk("Vulnerability", "v", title="Indirect prompt injection in Foo", description=DESC)])
+    g2 = ExtractionGraph(entities=[_mk("Vulnerability", "v", title="Indirect prompt injection in Foo", description=DESC)])
     e1, _ = merge_graphs([g1])
     e2, _ = merge_graphs([g2])
     assert e1[0].attributes["vuln_id"] == e2[0].attributes["vuln_id"]
@@ -102,7 +112,7 @@ def test_minted_vuln_id_is_deterministic():
 def test_relations_rewritten_to_canonical_keys():
     g = ExtractionGraph(
         entities=[
-            _mk("Vulnerability", "vu", vuln_id="CVE-2024-0002"),
+            _mk("Vulnerability", "vu", vuln_id="CVE-2024-0002", description=DESC),
             _mk("VulnerabilityType", "cwe", id="CWE-79"),
         ],
         relations=[ExtractedRelation(predicate="isA_vulnType", subject="vu", object="cwe")],
@@ -116,14 +126,14 @@ def test_relations_rewritten_to_canonical_keys():
 def test_deduplicates_identical_relations_across_chunks():
     g1 = ExtractionGraph(
         entities=[
-            _mk("Vulnerability", "vu", vuln_id="CVE-2024-0003"),
+            _mk("Vulnerability", "vu", vuln_id="CVE-2024-0003", description=DESC),
             _mk("VulnerabilityType", "cwe", id="CWE-79"),
         ],
         relations=[ExtractedRelation(predicate="isA_vulnType", subject="vu", object="cwe")],
     )
     g2 = ExtractionGraph(
         entities=[
-            _mk("Vulnerability", "vu", vuln_id="CVE-2024-0003"),
+            _mk("Vulnerability", "vu", vuln_id="CVE-2024-0003", description=DESC),
             _mk("VulnerabilityType", "cwe", id="CWE-79"),
         ],
         relations=[ExtractedRelation(predicate="isA_vulnType", subject="vu", object="cwe")],

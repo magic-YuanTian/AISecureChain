@@ -8,14 +8,20 @@ def test_no_id_vulnerabilities_are_separated_by_title():
             **{
                 "class": "Vulnerability",
                 "local_id": "v1",
-                "attributes": {"title": "Training data extraction vulnerability"},
+                "attributes": {
+                    "title": "Training data extraction vulnerability",
+                    "description": "An attacker can recover training examples from model outputs.",
+                },
             }
         ),
         ExtractedEntity(
             **{
                 "class": "Vulnerability",
                 "local_id": "v2",
-                "attributes": {"title": "Resource exhaustion attack"},
+                "attributes": {
+                    "title": "Resource exhaustion attack",
+                    "description": "Repeated requests consume model capacity until the service fails.",
+                },
             }
         ),
     ])

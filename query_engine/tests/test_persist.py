@@ -18,6 +18,8 @@ from extract_pipeline.models import (
 )
 from extract_pipeline.persist import persist_canonical
 
+DESC = "The product accepts untrusted input that can override intended behavior."
+
 
 def _mk(cls, lid, **attrs):
     return ExtractedEntity(**{"class": cls, "local_id": lid, "attributes": attrs})
@@ -30,7 +32,7 @@ def _vendor_cve_graph(vendor_name="OpenAI", vuln_id="CVE-2024-0101", refs=None):
             _mk("Vendor", "v1", name=vendor_name),
             _mk("Software", "s1", name="ChatGPT", is_ai=True),
             _mk("Version", "ver1", version_string="1.0"),
-            _mk("Vulnerability", "vu", vuln_id=vuln_id, title="Test vuln", cvss_base_score=7.5, references=refs),
+            _mk("Vulnerability", "vu", vuln_id=vuln_id, title="Test vuln", description=DESC, cvss_base_score=7.5, references=refs),
             _mk("VulnerabilityType", "cwe", id="CWE-79"),
         ],
         relations=[
@@ -163,9 +165,9 @@ def test_cross_reference_writes_same_as(tmp_db):
     """A page mentioning CVE-X and GHSA-Y referencing each other → same_as edge."""
     g = ExtractionGraph(
         entities=[
-            _mk("Vulnerability", "a", vuln_id="CVE-2024-0301",
+            _mk("Vulnerability", "a", vuln_id="CVE-2024-0301", description=DESC,
                 references=["https://github.com/advisories/GHSA-aaaa-bbbb-cccc"]),
-            _mk("Vulnerability", "b", vuln_id="GHSA-aaaa-bbbb-cccc"),
+            _mk("Vulnerability", "b", vuln_id="GHSA-aaaa-bbbb-cccc", description=DESC),
         ],
         relations=[],
     )
@@ -188,13 +190,14 @@ def test_cross_reference_writes_same_as(tmp_db):
 
 def test_vuln_enrichment_fills_blanks_not_overwrites(tmp_db):
     """Re-insert with new fields fills blanks but never overwrites existing values."""
-    g1 = ExtractionGraph(entities=[_mk("Vulnerability", "v", vuln_id="CVE-2024-0401", title="original")])
+    g1 = ExtractionGraph(entities=[_mk("Vulnerability", "v", vuln_id="CVE-2024-0401", title="original", description=DESC)])
     ents, rels = merge_graphs([g1])
     persist_canonical(ents, rels, db_path=tmp_db)
 
     g2 = ExtractionGraph(entities=[_mk(
         "Vulnerability", "v", vuln_id="CVE-2024-0401",
         title="NEW title (should be ignored)",
+        description=DESC,
         cvss_severity="HIGH",
     )])
     ents2, rels2 = merge_graphs([g2])
@@ -211,7 +214,7 @@ def test_vuln_enrichment_fills_blanks_not_overwrites(tmp_db):
 def test_titled_no_id_vuln_is_minted_and_persisted(tmp_db):
     # A finding with a title but no official CVE/GHSA id is no longer dropped:
     # the merger mints an internal AISC id and persist stores it.
-    g = ExtractionGraph(entities=[_mk("Vulnerability", "v", title="No id here")])
+    g = ExtractionGraph(entities=[_mk("Vulnerability", "v", title="No id here", description=DESC)])
     ents, rels = merge_graphs([g])
     stats = persist_canonical(ents, rels, db_path=tmp_db)
 

@@ -148,7 +148,15 @@ CLASS_HINTS: dict[str, dict[str, Any]] = {
                 ),
             },
             "title": {"type": "string", "required": False, "hint": "Short title/headline."},
-            "description": {"type": "string", "required": False, "hint": "Longer description."},
+            "description": {
+                "type": "string",
+                "required": True,
+                "hint": (
+                    "2–4 sentences stating the weakness as described in the source. "
+                    "Required even for CVE/GHSA records — paraphrase the advisory or article; "
+                    "do not leave empty."
+                ),
+            },
             "date_published": {"type": "string", "required": False, "hint": "ISO 8601 date."},
             "date_updated": {"type": "string", "required": False, "hint": "ISO 8601 date."},
             "cvss_base_score": {"type": "number", "required": False, "hint": "Numeric 0-10."},
@@ -159,6 +167,11 @@ CLASS_HINTS: dict[str, dict[str, Any]] = {
         },
         "example": {
             "vuln_id": "CVE-2024-5184",
+            "title": "EmailGPT Prompt Injection",
+            "description": (
+                "The EmailGPT API accepts a crafted prompt that overrides intended "
+                "instructions and can leak the system prompt."
+            ),
             "cvss_severity": "HIGH",
             "cvss_base_score": 7.5,
         },

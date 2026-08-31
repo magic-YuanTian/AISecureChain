@@ -377,6 +377,9 @@ def merge_graphs(
         if e.class_name == "Vulnerability":
             if not e.attributes.get("vuln_id") and not e.attributes.get("title"):
                 continue
+            desc = e.attributes.get("description")
+            if not (isinstance(desc, str) and desc.strip()):
+                continue
         if e.class_name == "Vendor" and not e.attributes.get("name"):
             continue
         if e.class_name == "Software" and not e.attributes.get("name"):

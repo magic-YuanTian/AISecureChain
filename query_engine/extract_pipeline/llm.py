@@ -103,7 +103,11 @@ EXTRACTION RULES (follow strictly):
 11. For security news/blogs, emit a Vulnerability even when there is no CVE if
     the text clearly states a security weakness, exposure, bypass, abuse path,
     data leak, credential leak, or resource/billing abuse. Use the article title
-    or the explicit finding as the vulnerability title. Leave ``vuln_id`` absent.
+    or the explicit finding as the vulnerability title. Leave ``vuln_id`` absent
+    unless a CVE or GHSA appears in the chunk — then put that exact id in
+    ``vuln_id``. ALWAYS set ``description`` to 2–4 sentences restating the
+    weakness from this chunk (including CVE/GHSA records). Do not omit it.
+    Paraphrase the source; do not invent facts that are not in the chunk.
     IMPORTANT: If the article describes ONE central vulnerability, finding, or
     attack technique (with examples, sub-categories, or mitigations), emit only
     ONE Vulnerability entity for the central finding. Do NOT emit separate

@@ -56,6 +56,7 @@ def sample_vuln_graph() -> ExtractionGraph:
             ExtractedEntity(**{"class": "Vulnerability", "local_id": "vu1", "attributes": {
                 "vuln_id": "CVE-2023-36258",
                 "title": "PALChain command injection",
+                "description": "PALChain interpolates untrusted LLM output into a shell command.",
                 "cvss_base_score": 9.8,
                 "cvss_severity": "CRITICAL",
                 "references": ["https://example.com/a", "https://example.com/b"],

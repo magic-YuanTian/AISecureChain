@@ -42,6 +42,7 @@ SINGLE_CVE_JSON = json.dumps({
         {"class": "Vulnerability", "local_id": "vu1", "attributes": {
             "vuln_id": "CVE-2024-5184",
             "title": "ChatGPT prompt injection",
+            "description": "A crafted prompt can override ChatGPT instructions and leak user data.",
             "cvss_base_score": 7.5,
             "cvss_severity": "HIGH",
         }},
@@ -96,6 +97,7 @@ MULTI_JSON = json.dumps({
         {"class": "Vulnerability", "local_id": f"vu{i}", "attributes": {
             "vuln_id": f"CVE-2024-{i:04d}",
             "title": f"LangChain SQL injection #{i}",
+            "description": "Untrusted input is concatenated into a SQL query.",
             "cvss_severity": "HIGH",
         }} for i in range(3)
     ],

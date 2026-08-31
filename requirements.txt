@@ -7,6 +7,7 @@ pandas>=2.2.0
 pydantic>=2.0
 rdflib>=7.0
 PyYAML>=6.0
+pymupdf>=1.24.0  # extract_owasp_yaml.py (ASI/ML PDFs)
 crawl4ai>=0.4
 openai>=1.0
 tenacity>=8.0

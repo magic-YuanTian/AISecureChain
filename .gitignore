@@ -83,6 +83,12 @@ sanjay_notes.md
 cwec_*.xml
 query_engine/data/cwe_faiss/
 
+# OWASP Top-10 PDFs and extracted YAML. The classifier ships a frozen
+# system prompt in query_engine/owasp_classifier/prompts/system_prompt.txt.
+# Rebuild YAML locally with: python query_engine/scripts/extract_owasp_yaml.py
+/OWASP*.pdf
+query_engine/data/owasp/
+
 # ── Python ───────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]

@@ -1,0 +1,40 @@
+{
+  "url": "fixture://securityweek-critical-bug-could.md",
+  "markdown": "# Critical Bug Could Expose 300,000 Ollama Deployments to Information Theft\nDubbed Bleeding Llama, the heap out-of-bounds read issue can be exploited remotely, without authentication.\n![](https://www.securityweek.com/wp-content/uploads/2023/10/Iounut-SecurityWeek.jpg)\nBy\n[Ionut Arghire](https://www.securityweek.com/contributors/ionut-arghire/)\n| May 5, 2026 (8:39 AM ET) \n[ ](https://www.securityweek.com/critical-bug-could-expose-300000-ollama-deployments-to-information-theft/ \"Share on Facebook\") [ ](https://www.securityweek.com/critical-bug-could-expose-300000-ollama-deployments-to-information-theft/ \"Tweet This Post\")\n  * [\n    * Flipboard ](https://www.securityweek.com/critical-bug-could-expose-300000-ollama-deployments-to-information-theft/ \"Share on Flipboard\") [\n    * Reddit ](https://www.securityweek.com/critical-bug-could-expose-300000-ollama-deployments-to-information-theft/ \"Share on Reddit\") [\n    * Whatsapp ](https://web.whatsapp.com/send?text=Critical%20Bug%20Could%20Expose%20300,000%20Ollama%20Deployments%20to%20Information%20Theft%20https://www.securityweek.com/critical-bug-could-expose-300000-ollama-deployments-to-information-theft/) [\n    * Whatsapp ](whatsapp://send?text=Critical%20Bug%20Could%20Expose%20300,000%20Ollama%20Deployments%20to%20Information%20Theft%20https://www.securityweek.com/critical-bug-could-expose-300000-ollama-deployments-to-information-theft/)\n    * Email\n\n![Llama Ollama vulnerability](https://www.securityweek.com/wp-content/uploads/2024/05/llama-drama-.jpg)\n**Roughly 300,000 Ollama deployments are prone to sensitive information theft through a remotely exploitable, unauthenticated critical vulnerability, Cyera warns.**\nOllama is an open source solution for running LLMs on local machines and is highly popular among organizations as a self-hosted AI inference engine. \nA heap out-of-bounds read issue in Ollama could be exploited to access sensitive information stored on the heap, including prompts, messages, and environment variables, including API keys, tokens, and secrets, Cyera says. \nTracked as [CVE-2026-7482](https://nvd.nist.gov/vuln/detail/CVE-2026-7482) (CVSS score of 9.3) and dubbed [Bleeding Llama](https://www.cyera.com/research/bleeding-llama-critical-unauthenticated-memory-leak-in-ollama), the bug affects the GGUF model loader, which accepts an attacker-supplied GGUF file containing a declared tensor offset and size larger than the file\u2019s length. \nWhen processing the file, the sensor reads past the allocated heap buffer, accessing memory that may contain sensitive information. \n\u201cThe attacker then leverages Ollama\u2019s built-in model push feature to exfiltrate the resulting file \u2013 complete with stolen heap data \u2013 to an attacker-controlled server. The entire attack requires only three unauthenticated API calls,\u201d Cyera says.\nAdvertisement. Scroll to continue reading.\nThe cybersecurity firm explains that Ollama launches by default without authentication, and that it listens to all network interfaces, meaning that all internet-accessible instances are prone to exploitation. \n\u201cWith approximately 300,000 Ollama servers currently exposed on the public internet, this vulnerability is immediately and broadly exploitable \u2013 no credentials required,\u201d Cyera warns. \nDepending on how Ollama is used, successful exploitation of Bleeding Llama could expose employee interactions, development code, routed tool outputs, and prompts containing PII, PHI, and other sensitive information. \nAccording to Cyera, \u201cany deployment where Ollama is network-accessible without a firewall or authentication proxy in front of it\u201d is at risk of exploitation. \nThe vulnerability was addressed in Ollama version 0.17.1. Organizations are advised to apply the fix as soon as possible and restrict network access to their deployments. Deploying an authentication proxy and network segmentation should improve security. \nOrganizations should also audit running instances for internet exposure and consider any instance accessible from the internet, as well as the environment variables and data passing through it, to be compromised. \n**Related:** [MetInfo, Weaver E-cology Vulnerabilities in Attackers\u2019 Crosshairs](https://www.securityweek.com/metinfo-weaver-e-cology-vulnerabilities-in-attackers-crosshairs/)\n**Related:** [WhatsApp Discloses File Spoofing, Arbitrary URL Scheme Vulnerabilities](https://www.securityweek.com/whatsapp-discloses-file-spoofing-arbitrary-url-scheme-vulnerabilities/)\n**Related:** [Firefox Vulnerability Allows Tor User Fingerprinting](https://www.securityweek.com/firefox-vulnerability-allows-tor-user-fingerprinting/)\n**Related:** [Apple Patches iOS Flaw Allowing Recovery of Deleted Chats](https://www.securityweek.com/apple-patches-ios-flaw-allowing-recovery-of-deleted-chats/)\n![](https://www.securityweek.com/wp-content/uploads/2023/10/Iounut-SecurityWeek.jpg)\nWritten By [Ionut Arghire](https://www.securityweek.com/contributors/ionut-arghire/)\nIonut Arghire is an international correspondent for SecurityWeek.\n[](https://twitter.com/IonutArghire)\n## Daily Briefing Newsletter\nSubscribe to the SecurityWeek Email Briefing for the latest cybersecurity threats, trends, and expert insights.",
+  "markdown_length": 5193,
+  "chunks_total": 1,
+  "chunks_extracted": 0,
+  "raw_graphs": [],
+  "canonical_entities": [],
+  "canonical_relations": [],
+  "db_stats": null,
+  "errors": [
+    "No extractions from any chunk."
+  ],
+  "warnings": [
+    "chunk 0: empty graph (no entities/relations)"
+  ],
+  "llm_usage": {
+    "extraction": {
+      "prompt_tokens": 1360,
+      "completion_tokens": 4898,
+      "total_tokens": 6258,
+      "cost": null,
+      "calls": 1
+    },
+    "validation": {
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "cost": null,
+      "calls": 0
+    },
+    "total": {
+      "prompt_tokens": 1360,
+      "completion_tokens": 4898,
+      "total_tokens": 6258,
+      "cost": null,
+      "calls": 1
+    }
+  }
+}

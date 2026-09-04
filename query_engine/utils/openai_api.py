@@ -14,6 +14,8 @@ touching this one function.
     AISC_LLM_ENDPOINT   base URL of your LLM server
     AISC_LLM_API_KEY    your key ("dummy" is fine for a local vLLM/Ollama)
     AISC_LLM_MODEL      model name for extraction / validate (e.g. gpt-4o)
+    AISC_USE_OLLAMA     set to true to use the local Ollama server
+    AISC_OLLAMA_MODEL   local Ollama model name (e.g. gemma3:4b)
     AISC_JUDGE_MODEL    optional; FP-auditor model (falls back to AISC_LLM_MODEL)
     AISC_JUDGE_ENDPOINT / AISC_JUDGE_API_KEY  optional overrides for the judge
 
@@ -25,6 +27,8 @@ replace the body of :func:`get_response` — the contract is documented there.
 from __future__ import annotations
 
 import os
+import json
+import sys
 from typing import Any
 
 _ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".env")
@@ -32,6 +36,23 @@ _ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
 # Azure pins the chat-completions protocol to a dated version. It is a protocol
 # constant, not a per-deployment setting, so it lives here rather than in .env.
 _AZURE_API_VERSION = "2024-10-01-preview"
+_OLLAMA_ENDPOINT = "http://localhost:11434/v1"
+
+
+def _env_truthy(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _debug_llm(label: str, value: Any) -> None:
+    """Print verbose LLM diagnostics without affecting normal output."""
+    if not _env_truthy("AISC_VERBOSE_LLM"):
+        return
+    try:
+        dump = value.model_dump(mode="json") if hasattr(value, "model_dump") else value
+        rendered = json.dumps(dump, indent=2, ensure_ascii=False, default=str)
+    except Exception:
+        rendered = repr(value)
+    print(f"\n[llm-debug] {label}\n{rendered}", file=sys.stderr, flush=True)
 
 
 def _load_env_file(path: str = _ENV_PATH) -> None:
@@ -138,9 +159,15 @@ def get_response_with_usage(
     api_key: str | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """Send a chat request; return ``(text, usage)``."""
-    endpoint = endpoint if endpoint is not None else os.environ.get("AISC_LLM_ENDPOINT", "")
-    api_key = api_key if api_key is not None else os.environ.get("AISC_LLM_API_KEY", "")
-    model = model if model is not None else os.environ.get("AISC_LLM_MODEL", "gpt-4o")
+    use_ollama = _env_truthy("AISC_USE_OLLAMA")
+    if use_ollama:
+        endpoint = endpoint if endpoint is not None else _OLLAMA_ENDPOINT
+        api_key = api_key if api_key is not None else "dummy"
+        model = model if model is not None else os.environ.get("AISC_OLLAMA_MODEL", "gemma3:4b")
+    else:
+        endpoint = endpoint if endpoint is not None else os.environ.get("AISC_LLM_ENDPOINT", "")
+        api_key = api_key if api_key is not None else os.environ.get("AISC_LLM_API_KEY", "")
+        model = model if model is not None else os.environ.get("AISC_LLM_MODEL", "gpt-4o")
     if not api_key:
         raise LLMNotConfigured()
 
@@ -149,6 +176,7 @@ def get_response_with_usage(
 
     @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
     def _call() -> tuple[str, dict[str, Any]]:
+        _debug_llm("request messages", messages)
         if "azure" in (endpoint or ""):
             client = AzureOpenAI(azure_endpoint=endpoint, api_key=api_key,
                                  api_version=_AZURE_API_VERSION)
@@ -157,8 +185,11 @@ def get_response_with_usage(
         completion = client.chat.completions.create(
             model=model, messages=messages, temperature=temperature,
         )
+        _debug_llm("raw completion object", completion)
         msg = completion.choices[0].message
         text = msg.content or getattr(msg, "reasoning_content", None) or ""
+        _debug_llm("returned model content", text)
+        _debug_llm("usage", _usage_from_completion(completion))
         return text, _usage_from_completion(completion)
 
     return _call()

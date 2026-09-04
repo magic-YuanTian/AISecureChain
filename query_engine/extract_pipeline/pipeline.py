@@ -302,6 +302,11 @@ def _cli() -> None:
         help="With --fixture: skip clean_markdown_boilerplate (fixtures are usually pre-cleaned).",
     )
     ap.add_argument("--skip-db", action="store_true", help="Do not write to SQLite")
+    ap.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print prompts, raw LLM completions, parsed JSON, and usage to stderr",
+    )
     ap.add_argument("--max-chunks", type=int, default=12)
     ap.add_argument(
         "--max-parallel-chunks",
@@ -314,6 +319,8 @@ def _cli() -> None:
     )
     ap.add_argument("--json", dest="out_json", default=None, help="Write full result to JSON")
     args = ap.parse_args()
+    if args.verbose:
+        os.environ["AISC_VERBOSE_LLM"] = "true"
 
     if args.fixture:
         from pathlib import Path
